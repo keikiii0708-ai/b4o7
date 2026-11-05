@@ -1,0 +1,303 @@
+import { weekDayLetters } from "./dates.js";
+import { statusLabel, timerStatus } from "./scoring.js";
+
+const urls = new Map();
+
+export const MOODS = ["Productive", "Focused", "Tired", "Unmotivated", "Great", "Neutral"];
+
+export const ICON_CHOICES = ["🎯", "📖", "🏋️", "🏃", "🚶", "💧", "🧘", "✍️", "💪", "🧠", "🌙", "📚", "💼", "🎨", "🎵", "🍎", "🚴", "🏊", "☀️", "🪴", "🧩", "💤"];
+
+export function h(tag, attrs = {}, children = []) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs || {})) {
+    if (value == null || value === false) continue;
+    if (key === "class") node.className = value;
+    else if (key === "text") node.textContent = value;
+    else if (key === "value") node.value = value;
+    else if (key === "checked") node.checked = Boolean(value);
+    else if (key === "disabled") node.disabled = Boolean(value);
+    else if (key === "dataset" && value && typeof value === "object") {
+      for (const [name, item] of Object.entries(value)) node.dataset[name] = item;
+    } else if (key === "style" && value && typeof value === "object") Object.assign(node.style, value);
+    else if (key.startsWith("on") && typeof value === "function") node.addEventListener(key.slice(2).toLowerCase(), value);
+    else node.setAttribute(key, value === true ? "" : String(value));
+  }
+  if (tag === "button" && !attrs.type) node.type = "button";
+  append(node, children);
+  return node;
+}
+
+function append(node, child) {
+  if (child == null || child === false) return;
+  if (Array.isArray(child)) {
+    for (const item of child) append(node, item);
+    return;
+  }
+  node.append(child instanceof Node ? child : document.createTextNode(String(child)));
+}
+
+export function icon(name) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.classList.add("ico");
+  const add = (tag, attrs) => {
+    const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+    for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
+    svg.append(el);
+  };
+  const stroke = {
+    fill: "none",
+    stroke: "currentColor",
+    "stroke-width": "1.7",
+    "stroke-linecap": "round",
+    "stroke-linejoin": "round",
+  };
+  if (name === "settings") {
+    add("circle", { ...stroke, cx: "12", cy: "12", r: "3" });
+    add("path", { ...stroke, d: "M12 3.5v2.2M12 18.3V20.5M3.5 12h2.2M18.3 12H20.5M5.8 5.8l1.6 1.6M16.6 16.6l1.6 1.6M18.2 5.8l-1.6 1.6M7.4 16.6l-1.6 1.6" });
+    return svg;
+  }
+  const paths = {
+    home: "M4 10.5 12 4l8 6.5V20H15v-6H9v6H4z",
+    goals: "M12 3.5l1.9 4.2 4.6.5-3.4 3.1.9 4.5L12 13.6 8 15.8l.9-4.5L5.5 8.2l4.6-.5z",
+    moon: "M20 14.5A8.2 8.2 0 0 1 9.6 3.2 6.6 6.6 0 1 0 20 14.5z",
+    gift: "M4 10h16v9H4zM3 7h18v3H3zM12 7v12",
+    calendar: "M5 5h14v15H5zM5 9h14M8 3.5V6M16 3.5V6",
+    back: "M15 5 8 12l7 7",
+    plus: "M12 5v14M5 12h14",
+    close: "M6 6l12 12M18 6 6 18",
+  };
+  add("path", { ...stroke, d: paths[name] || paths.home });
+  if (name === "gift") add("path", { ...stroke, d: "M12 7c-1.8 0-3-1.6-2-2.8C11.2 3 12 5.2 12 7c1.8 0 3-1.6 2-2.8C12.8 3 12 5.2 12 7z" });
+  return svg;
+}
+
+export function field(label, control, hint) {
+  return h("label", { class: "field" }, [
+    h("span", { class: "field-label", text: label }),
+    control,
+    hint ? h("span", { class: "hint", text: hint }) : null,
+  ]);
+}
+
+export function dots(states, letters) {
+  const label = states.map((state, index) => `${letters[index]} ${state}`).join(", ");
+  return h("div", { class: "week-dots" }, [
+    h("div", { class: "dots", role: "img", "aria-label": label }, states.map((state) => h("span", { class: `dot ${state}` }))),
+    h("div", { class: "dot-letters", "aria-hidden": "true" }, letters.map((letter) => h("span", { text: letter }))),
+  ]);
+}
+
+export function meter(wins, target) {
+  const pct = target ? Math.min(100, Math.round((wins / target) * 100)) : 0;
+  return h("div", { class: "meter-row" }, [
+    h("div", { class: "meter", "aria-hidden": "true" }, [h("span", { style: { width: `${pct}%` } })]),
+    h("span", { class: "meter-label", text: `${wins} of ${target}` }),
+  ]);
+}
+
+export function seriesCard({ goal, week, weekStartsOn, featured, footer, onOpen }) {
+  const result = week.result;
+  const open = typeof onOpen === "function";
+  return h("article", { class: `card series ${result.status}${featured ? " featured" : ""}` }, [
+    h(open ? "button" : "div", { class: "series-hit", onClick: open ? onOpen : null }, [
+      h("div", { class: "series-top" }, [
+        h("div", { class: "series-id" }, [
+          h("span", { class: "emoji", "aria-hidden": "true", text: goal.icon || "•" }),
+          h("div", {}, [
+            h("h2", { class: "goal-name", text: goal.name }),
+            h("p", { class: `status-line ${result.status}`, text: statusLabel(result.status) }),
+          ]),
+        ]),
+        h("p", { class: "score", text: result.score }),
+      ]),
+      dots(week.dayStates, weekDayLetters(weekStartsOn)),
+      meter(result.wins, result.target),
+      h("p", { class: "copy", text: week.copy }),
+    ]),
+    footer || null,
+  ]);
+}
+
+export function renderTodayAction(ctx, goal, week) {
+  const index = week.dates.indexOf(ctx.today);
+  const dayState = week.dayStates[index];
+  if (dayState === "neutral") return h("span", { class: "pill", text: "Rest" });
+  if (dayState === "win") {
+    if (goal.completionMethod === "manual") {
+      return h("button", { class: "btn ghost small", onClick: () => ctx.actions.setDayExplicit(goal.id, ctx.today, null) }, "Undo");
+    }
+    return h("span", { class: "pill win", text: "Win" });
+  }
+  if (dayState === "loss") return h("span", { class: "pill loss", text: "Loss" });
+  if (goal.completionMethod === "timer") {
+    const record = ctx.state.dailyRecords.find((item) => item.goalId === goal.id && item.date === ctx.today);
+    const minutes = week.snapshot.timerDurationMinutes || goal.timerDurationMinutes || 25;
+    if (record?.timerStartedAt && !record.timerEndedAt) {
+      const status = timerStatus(record.timerStartedAt, minutes, ctx.now);
+      return h("div", { class: "timer-live" }, [
+        h("span", {
+          class: "timer-readout",
+          dataset: {
+            remaining: "1",
+            start: record.timerStartedAt,
+            need: String(minutes * 60000),
+            goal: goal.id,
+            date: ctx.today,
+          },
+          text: formatClock(status.remainingMs),
+        }),
+        h("button", { class: "btn ghost small", onClick: () => ctx.actions.cancelTimer(goal.id, ctx.today) }, "Cancel"),
+      ]);
+    }
+    return h("button", { class: "btn primary small", onClick: () => ctx.actions.startTimer(goal.id, ctx.today) }, `Start ${minutes}m`);
+  }
+  if (goal.completionMethod === "threshold") {
+    const record = ctx.state.dailyRecords.find((item) => item.goalId === goal.id && item.date === ctx.today);
+    const label = week.snapshot.thresholdLabel || goal.thresholdLabel || "Count";
+    const target = week.snapshot.thresholdTarget ?? goal.thresholdTarget ?? "";
+    return h("form", {
+      class: "inline-form",
+      onSubmit: (event) => {
+        event.preventDefault();
+        const value = new FormData(event.currentTarget).get("value");
+        ctx.actions.logThreshold(goal.id, ctx.today, value);
+      },
+    }, [
+      h("input", {
+        name: "value",
+        type: "number",
+        inputmode: "decimal",
+        step: "any",
+        min: "0",
+        "aria-label": label,
+        value: record?.thresholdValue ?? "",
+        placeholder: String(target),
+        "data-live": "text",
+      }),
+      h("button", { type: "submit", class: "btn primary small" }, "Log"),
+    ]);
+  }
+  if (goal.completionMethod === "sleep") {
+    return h("button", { class: "btn ghost small", onClick: () => ctx.go("/sleep") }, "Sleep");
+  }
+  return h("button", { class: "btn primary small", onClick: () => ctx.actions.setDayExplicit(goal.id, ctx.today, "win") }, "Log win");
+}
+
+export function topbar({ title, date, brand, onBack, onSettings }) {
+  return h("header", { class: "topbar" }, [
+    onBack
+      ? h("button", { class: "icon-btn", "aria-label": "Back", onClick: onBack }, [icon("back")])
+      : null,
+    h("div", { class: "topbar-copy" }, [
+      brand ? h("h1", { class: "brand", text: "B4O7" }) : null,
+      title ? h("h1", { class: "page-title", text: title }) : null,
+      date ? h("p", { class: "date-line", text: date }) : null,
+    ]),
+    onSettings
+      ? h("button", { class: "icon-btn", "aria-label": "Settings", "data-action": "settings", onClick: onSettings }, [icon("settings")])
+      : h("span", { class: "icon-spacer" }),
+  ]);
+}
+
+export function emptyState(title, body, action) {
+  return h("section", { class: "empty card" }, [
+    h("h2", { text: title }),
+    h("p", { class: "muted", text: body }),
+    action || null,
+  ]);
+}
+
+export function imageUrl(state, id) {
+  if (!id) return "";
+  const image = (state.images || []).find((item) => item.id === id);
+  if (!image?.blob) return "";
+  if (!urls.has(id)) urls.set(id, URL.createObjectURL(image.blob));
+  return urls.get(id);
+}
+
+export function formatClock(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000));
+  const seconds = total % 60;
+  const minutes = Math.floor(total / 60) % 60;
+  const hours = Math.floor(total / 3600);
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
+export function formatPercent(rate) {
+  if (rate == null) return "—";
+  return `${Math.round(rate * 100)}%`;
+}
+
+export function showToast(message) {
+  document.querySelector(".toast")?.remove();
+  const node = h("div", { class: "toast", role: "status" }, message);
+  document.body.append(node);
+  setTimeout(() => node.remove(), 2800);
+}
+
+export function renderModal(modal, close) {
+  const confirmBtn = h("button", {
+    type: "button",
+    class: modal.danger ? "btn danger block" : "btn primary block",
+    "data-action": "confirm-modal",
+    disabled: Boolean(modal.typed),
+    onClick: () => modal.onConfirm?.(),
+  }, modal.confirmLabel || "Confirm");
+  const typed = modal.typed
+    ? h("input", {
+      type: "text",
+      autocomplete: "off",
+      autocapitalize: "characters",
+      "aria-label": `Type ${modal.typed}`,
+      "data-live": "text",
+      onInput: (event) => {
+        confirmBtn.disabled = event.target.value.trim() !== modal.typed;
+      },
+    })
+    : null;
+  return h("div", {
+    class: "sheet-back",
+    onClick: (event) => {
+      if (event.target === event.currentTarget) close();
+    },
+  }, [
+    h("div", { class: "sheet", role: "dialog", "aria-modal": "true", "aria-label": modal.title }, [
+      h("h2", { text: modal.title }),
+      modal.text ? h("p", { class: "muted", text: modal.text }) : null,
+      modal.body || null,
+      typed ? field(`Type ${modal.typed} to confirm`, typed) : null,
+      h("div", { class: "stack tight" }, [
+        modal.confirmLabel === null ? null : confirmBtn,
+        h("button", { class: "btn ghost block", onClick: close }, modal.cancelLabel || "Cancel"),
+      ]),
+    ]),
+  ]);
+}
+
+export function calendar({ cells, marks, today, onPick, letters }) {
+  return h("div", { class: "calendar" }, [
+    h("div", { class: "cal-letters", "aria-hidden": "true" }, letters.map((letter) => h("span", { text: letter }))),
+    ...cells.map((cell) => {
+      const mark = marks(cell.date);
+      const classes = ["cal-cell", mark || "none"];
+      if (!cell.inMonth) classes.push("out");
+      if (cell.date === today) classes.push("today");
+      return h("button", {
+        class: classes.join(" "),
+        "aria-label": `${cell.date} ${mark || "empty"}`,
+        onClick: () => onPick(cell.date),
+      }, String(Number(cell.date.slice(8))));
+    }),
+  ]);
+}
+
+export function monthSwitcher(label, onPrev, onNext) {
+  return h("div", { class: "month-switch" }, [
+    h("button", { class: "icon-btn", "aria-label": "Previous month", onClick: onPrev }, [icon("back")]),
+    h("h2", { class: "month-label", text: label }),
+    h("button", { class: "icon-btn flip", "aria-label": "Next month", onClick: onNext }, [icon("back")]),
+  ]);
+}
