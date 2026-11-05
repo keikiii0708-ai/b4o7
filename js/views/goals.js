@@ -2,12 +2,17 @@ import { formatPrettyDate, weekDayLetters, weekMeta } from "../dates.js";
 import { validateGoalConfig } from "../scoring.js";
 import { buildGoalWeek, goalStats, milestoneCards } from "../selectors.js";
 import { blankGoal, fileToImageBlob, uid } from "../store.js";
-import { ICON_CHOICES, h, imageUrl, renderTodayAction, seriesCard, showToast, topbar } from "../ui.js";
+import { ICON_CHOICES, h, imageUrl, progressRing, renderTodayAction, seriesCard, sheetFrame, showToast, topbar } from "../ui.js";
 
 let editor = null;
 
 export function renderGoals(ctx) {
-  if (ctx.route.name === "goal-edit") return renderEditor(ctx);
+  if (ctx.route.name === "goal-edit") {
+    const missingGoal = ctx.route.id && !ctx.state.goals.some((goal) => goal.id === ctx.route.id);
+    if (missingGoal) return renderEditor(ctx);
+    const under = ctx.route.id ? renderDetail(ctx) : renderList(ctx);
+    return h("div", {}, [under, renderEditor(ctx)]);
+  }
   editor = null;
   if (ctx.route.name === "goal") return renderDetail(ctx);
   return renderList(ctx);
@@ -39,7 +44,10 @@ function goalRow(ctx, goal) {
       h("strong", { text: goal.name }),
       h("span", { class: "sub", text: `${goal.weeklyTarget} to win the week` }),
     ]),
-    h("span", { class: "row-score", text: goal.status === "active" ? week.result.score : goal.status }),
+    h("span", { class: "row-trail" }, [
+      progressRing(week.dayStates, { size: 32, hidden: true }),
+      h("span", { class: "row-score", text: goal.status === "active" ? week.result.score : goal.status }),
+    ]),
   ]);
 }
 
@@ -138,16 +146,17 @@ function renderEditor(ctx) {
   const check = validateGoalConfig({ weeklyTarget: Number(goal.weeklyTarget), restDays: goal.restDays });
   const letters = weekDayLetters(ctx.state.settings.weekStartsOn);
   const start = ctx.state.settings.weekStartsOn === "sunday" ? 0 : 1;
-  return h("form", {
-    onSubmit: (event) => {
-      event.preventDefault();
-      save(ctx);
-    },
-  }, [
-    topbar({
-      title: existing ? "Edit goal" : "New goal",
-      onBack: () => ctx.go(existing ? `/goals/${existing.id}` : "/goals"),
-    }),
+  const close = () => ctx.go(existing ? `/goals/${existing.id}` : "/goals");
+  return sheetFrame({
+    title: existing ? "Edit goal" : "New goal",
+    onClose: close,
+    children: h("form", {
+      class: "sheet-form",
+      onSubmit: (event) => {
+        event.preventDefault();
+        save(ctx);
+      },
+    }, [
     editor.error ? h("p", { class: "error", text: editor.error }) : null,
     fieldLive("Name", "name", goal.name, (value) => { goal.name = value; }),
     fieldLive("Description", "description", goal.description, (value) => { goal.description = value; }, true),
@@ -248,7 +257,8 @@ function renderEditor(ctx) {
       },
     }, "Add milestone"),
     h("button", { class: "btn primary block", style: { marginTop: "18px" }, type: "submit" }, "Save goal"),
-  ]);
+    ]),
+  });
 }
 
 function fieldLive(label, name, value, onValue, area = false, type = "text") {

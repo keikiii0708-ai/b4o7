@@ -127,7 +127,8 @@ export function renderSettings(ctx) {
       }, "Delete all data"),
     ]),
     h("p", { class: "eyebrow", text: "About" }),
-    h("div", { class: "card" }, [
+    h("div", { class: "card about-card" }, [
+      h("img", { class: "brand-hero", src: "./icons/favicon.svg", alt: "", width: "72", height: "72" }),
       h("p", { class: "slogan", text: "WIN 4. OWN YOUR WEEK." }),
       h("p", { text: "A week is like a 7 game series. All you gotta do is win 4 days." }),
       h("p", { class: "hint", text: "STILL IN THE GAME. EVERY WEEK IS ANOTHER SERIES. PROGRESS OVER PERFECTION." }),

@@ -6,6 +6,8 @@ B4O7 is a private habit tracker that stays on your phone. There is no account, n
 
 Each goal has its own series. Nothing is combined into one score.
 
+The icon is a ring of seven arcs — four muted green, three graphite — with a B4 monogram. That ring is the header mark. Each goal draws its week the same way: green is a win, red is a loss, grey is still open, and a dimmer stroke is a rest day.
+
 ## Put it on GitHub Pages
 
 You can do this from the GitHub website. You do not need Git, a terminal, or a build step.

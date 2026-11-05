@@ -49,7 +49,7 @@ export function icon(name) {
   const stroke = {
     fill: "none",
     stroke: "currentColor",
-    "stroke-width": "1.7",
+    "stroke-width": "1.6",
     "stroke-linecap": "round",
     "stroke-linejoin": "round",
   };
@@ -71,6 +71,91 @@ export function icon(name) {
   add("path", { ...stroke, d: paths[name] || paths.home });
   if (name === "gift") add("path", { ...stroke, d: "M12 7c-1.8 0-3-1.6-2-2.8C11.2 3 12 5.2 12 7c1.8 0 3-1.6 2-2.8C12.8 3 12 5.2 12 7z" });
   return svg;
+}
+
+const RING_SWEEP = 360 / 7 - 18;
+const RING_STEP = 360 / 7;
+const RING_START = -81;
+const RING_RADIUS = 32.2266;
+
+const RING_PALETTES = {
+  status: {
+    win: "#8DBF8F",
+    loss: "#C47D7D",
+    pending: "#8E9198",
+    neutral: "#2C2E32",
+    upcoming: "#3A3C42",
+    incomplete: "#8E9198",
+    none: "#3A3C42",
+  },
+  mark: {
+    win: "#8DBF8F",
+    mark: "#34363A",
+  },
+};
+
+function ringArc(index) {
+  const start = (RING_START + index * RING_STEP) * Math.PI / 180;
+  const end = start + RING_SWEEP * Math.PI / 180;
+  const cx = 50;
+  const cy = 50;
+  const r = RING_RADIUS;
+  const x0 = cx + r * Math.cos(start);
+  const y0 = cy + r * Math.sin(start);
+  const x1 = cx + r * Math.cos(end);
+  const y1 = cy + r * Math.sin(end);
+  const n = (value) => value.toFixed(2);
+  return `M ${n(x0)} ${n(y0)} A ${n(r)} ${n(r)} 0 0 1 ${n(x1)} ${n(y1)}`;
+}
+
+export function progressRing(states, options = {}) {
+  const palette = RING_PALETTES[options.palette || "status"];
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "12 12 76 76");
+  svg.setAttribute("width", String(options.size || 64));
+  svg.setAttribute("height", String(options.size || 64));
+  svg.classList.add("ring");
+  if (options.hidden) svg.setAttribute("aria-hidden", "true");
+  else {
+    svg.setAttribute("role", "img");
+    svg.setAttribute("aria-label", options.label || states.join(", "));
+  }
+  states.forEach((state, index) => {
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", ringArc(index));
+    path.setAttribute("fill", "none");
+    path.setAttribute("stroke", palette[state] || palette.none || "#3A3C42");
+    path.setAttribute("stroke-width", "5.66");
+    path.setAttribute("stroke-linecap", "round");
+    svg.append(path);
+  });
+  return svg;
+}
+
+export function brandMark(size = 30) {
+  return progressRing(["win", "win", "win", "win", "mark", "mark", "mark"], {
+    size,
+    label: "B4O7",
+    palette: "mark",
+  });
+}
+
+export function sheetFrame({ title, onClose, children }) {
+  return h("div", {
+    class: "sheet-back",
+    onClick: (event) => {
+      if (event.target === event.currentTarget) onClose?.();
+    },
+  }, [
+    h("div", { class: "sheet", role: "dialog", "aria-modal": "true", "aria-label": title }, [
+      h("div", { class: "sheet-grab", "aria-hidden": "true" }),
+      h("header", { class: "sheet-head" }, [
+        h("h2", { text: title }),
+        h("button", { class: "icon-btn", "aria-label": "Close", onClick: onClose }, [icon("close")]),
+      ]),
+      children,
+    ]),
+  ]);
 }
 
 export function field(label, control, hint) {
@@ -100,21 +185,30 @@ export function meter(wins, target) {
 export function seriesCard({ goal, week, weekStartsOn, featured, footer, onOpen }) {
   const result = week.result;
   const open = typeof onOpen === "function";
+  const letters = weekDayLetters(weekStartsOn);
+  const ring = progressRing(week.dayStates, { size: featured ? 108 : 52, hidden: true });
   return h("article", { class: `card series ${result.status}${featured ? " featured" : ""}` }, [
     h(open ? "button" : "div", { class: "series-hit", onClick: open ? onOpen : null }, [
       h("div", { class: "series-top" }, [
         h("div", { class: "series-id" }, [
-          h("span", { class: "emoji", "aria-hidden": "true", text: goal.icon || "•" }),
-          h("div", {}, [
+          featured ? null : h("span", { class: "emoji", "aria-hidden": "true", text: goal.icon || "•" }),
+          h("div", { class: "series-copy" }, featured ? [
+            h("p", { class: `status-line ${result.status}`, text: statusLabel(result.status) }),
+            h("p", { class: "score", text: result.score }),
+            h("h2", { class: "goal-name", text: goal.name }),
+          ] : [
             h("h2", { class: "goal-name", text: goal.name }),
             h("p", { class: `status-line ${result.status}`, text: statusLabel(result.status) }),
           ]),
         ]),
-        h("p", { class: "score", text: result.score }),
+        featured ? ring : h("div", { class: "series-side" }, [
+          h("p", { class: "score", text: result.score }),
+          ring,
+        ]),
       ]),
-      dots(week.dayStates, weekDayLetters(weekStartsOn)),
-      meter(result.wins, result.target),
       h("p", { class: "copy", text: week.copy }),
+      dots(week.dayStates, letters),
+      meter(result.wins, result.target),
     ]),
     footer || null,
   ]);
@@ -191,7 +285,10 @@ export function topbar({ title, date, brand, onBack, onSettings }) {
       ? h("button", { class: "icon-btn", "aria-label": "Back", onClick: onBack }, [icon("back")])
       : null,
     h("div", { class: "topbar-copy" }, [
-      brand ? h("h1", { class: "brand", text: "B4O7" }) : null,
+      brand ? h("div", { class: "brand-lockup" }, [
+        brandMark(30),
+        h("h1", { class: "brand", text: "B4O7" }),
+      ]) : null,
       title ? h("h1", { class: "page-title", text: title }) : null,
       date ? h("p", { class: "date-line", text: date }) : null,
     ]),
@@ -258,23 +355,19 @@ export function renderModal(modal, close) {
       },
     })
     : null;
-  return h("div", {
-    class: "sheet-back",
-    onClick: (event) => {
-      if (event.target === event.currentTarget) close();
-    },
-  }, [
-    h("div", { class: "sheet", role: "dialog", "aria-modal": "true", "aria-label": modal.title }, [
-      h("h2", { text: modal.title }),
+  return sheetFrame({
+    title: modal.title,
+    onClose: close,
+    children: [
       modal.text ? h("p", { class: "muted", text: modal.text }) : null,
       modal.body || null,
       typed ? field(`Type ${modal.typed} to confirm`, typed) : null,
-      h("div", { class: "stack tight" }, [
+      h("div", { class: "stack tight sheet-actions" }, [
         modal.confirmLabel === null ? null : confirmBtn,
         h("button", { class: "btn ghost block", onClick: close }, modal.cancelLabel || "Cancel"),
       ]),
-    ]),
-  ]);
+    ],
+  });
 }
 
 export function calendar({ cells, marks, today, onPick, letters }) {

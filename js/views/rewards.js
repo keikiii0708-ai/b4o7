@@ -1,6 +1,6 @@
 import { formatRange, formatShortDate, weekMeta } from "../dates.js";
 import { buildGoalWeek, milestoneCards } from "../selectors.js";
-import { h, imageUrl, meter, topbar } from "../ui.js";
+import { h, imageUrl, meter, progressRing, topbar } from "../ui.js";
 
 const seen = new Set();
 
@@ -55,9 +55,13 @@ function rewardCard(ctx, goal, week, reward, status, claim, currentStart) {
   const fresh = status === "unlocked" && !seen.has(`${goal.id}:${week.weekStart}`);
   if (fresh) seen.add(`${goal.id}:${week.weekStart}`);
   const photo = imageUrl(ctx.state, reward.imageId);
+  const ring = progressRing(week.dayStates, { size: photo ? 36 : 78, hidden: true });
   return h("article", { class: `card reward ${status}${fresh ? " just-unlocked" : ""}` }, [
-    photo ? h("img", { class: "reward-photo", alt: "", src: photo }) : null,
-    h("p", { class: `status-line ${status === "unlocked" || status === "claimed" ? "won" : ""}`, text: status.toUpperCase() }),
+    photo ? h("img", { class: "reward-photo", alt: "", src: photo }) : h("div", { class: "reward-photo reward-fallback", "aria-hidden": "true" }, [ring]),
+    h("div", { class: "spread" }, [
+      h("p", { class: `status-line ${status === "unlocked" || status === "claimed" ? "won" : ""}`, text: status.toUpperCase() }),
+      photo ? ring : null,
+    ]),
     h("h2", { class: "goal-name", style: { marginTop: "6px" }, text: reward.name }),
     h("p", { class: "hint", text: `${goal.name} · ${week.weekStart === currentStart ? "This week" : formatRange(week.weekStart, week.weekEnd)}` }),
     reward.description ? h("p", { style: { marginTop: "8px" }, text: reward.description }) : null,

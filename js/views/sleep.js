@@ -1,13 +1,14 @@
 import { addDays, formatMonthYear, formatPrettyDate, localParts, monthGrid, shiftMonth, weekDayLetters } from "../dates.js";
 import { sleepCalendarMark, sleepSessionForDate, evaluateSleep, findOpenSleep } from "../sleep.js";
-import { calendar, field, h, monthSwitcher, showToast, topbar } from "../ui.js";
+import { calendar, field, h, monthSwitcher, sheetFrame, showToast, topbar } from "../ui.js";
 
 let form = null;
 
 export function renderSleep(ctx) {
-  if (ctx.route.name === "sleep-day") return renderSleepDay(ctx);
-  form = null;
-  return renderSleepHome(ctx);
+  if (ctx.route.name !== "sleep-day") form = null;
+  const home = renderSleepHome(ctx);
+  if (ctx.route.name !== "sleep-day") return home;
+  return h("div", {}, [home, renderSleepDay(ctx)]);
 }
 
 function renderSleepHome(ctx) {
@@ -18,8 +19,9 @@ function renderSleepHome(ctx) {
   return h("div", {}, [
     topbar({ title: "Sleep", onSettings: () => ctx.go("/settings") }),
     h("div", { class: "sleep-hero" }, [
+      h("p", { class: "eyebrow", text: "Now" }),
       h("p", { class: "clock-xl", dataset: { clock: "1" }, text: localParts(new Date(), ctx.zone).hhmm }),
-      h("p", { class: "hint", text: ctx.zone }),
+      h("p", { class: "hint", text: open ? "A night is open." : ctx.zone }),
     ]),
     open ? awakePanel(ctx, open) : h("button", {
       class: "sleep-cta",
@@ -58,13 +60,10 @@ function awakePanel(ctx, open) {
   const label = new Intl.DateTimeFormat("en-GB", {
     hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: open.bedtimeTz || ctx.zone,
   }).format(new Date(open.bedtimeUtc));
-  return h("div", { class: "card" }, [
-    h("p", { class: "hint", text: "Bedtime recorded" }),
-    h("p", { class: "big-time", text: label }),
-    h("p", { class: "hint", text: `${open.bedtimeOffset || ""} · ${open.bedtimeTz || ""}` }),
+  return h("div", { class: "sleep-awake" }, [
+    h("p", { class: "hint", text: `In bed since ${label} · ${open.bedtimeOffset || ""} ${open.bedtimeTz || ""}`.replace(/\s+/g, " ").trim() }),
     h("button", {
       class: "sleep-cta",
-      style: { marginTop: "14px" },
       onClick: async () => {
         const result = await ctx.actions.sleepWake();
         if (!result.ok) {
@@ -73,7 +72,7 @@ function awakePanel(ctx, open) {
         }
       },
     }, "I'M AWAKE"),
-    h("button", { class: "btn ghost block", style: { marginTop: "8px" }, onClick: () => ctx.go("/sleep/open") }, "Correct bedtime"),
+    h("button", { class: "btn ghost block", onClick: () => ctx.go("/sleep/open") }, "Correct bedtime"),
   ]);
 }
 
@@ -158,12 +157,11 @@ function renderSleepDay(ctx) {
     form = initialForm(ctx, record);
   }
   const evaluation = record?.wakeUtc ? evaluateSleep(record) : null;
-  return h("div", {}, [
-    topbar({
-      title: open ? "Open night" : formatPrettyDate(ctx.route.date),
-      onBack: () => ctx.go("/sleep"),
-    }),
-    record && !form.editing ? h("div", { class: "card" }, [
+  const title = open ? "Open night" : formatPrettyDate(ctx.route.date);
+  return sheetFrame({
+    title,
+    onClose: () => ctx.go("/sleep"),
+    children: record && !form.editing ? h("div", { class: "sheet-form" }, [
       h("div", { class: "time-pair" }, [
         h("div", {}, [h("p", { class: "hint", text: "Bed" }), h("p", { class: "big-time", text: wall(record.bedtimeUtc, record.bedtimeTz) })]),
         h("span", { class: "arrow", text: "→" }),
@@ -192,12 +190,12 @@ function renderSleepDay(ctx) {
         }, "Delete"),
       ]),
     ]) : sleepForm(ctx, record),
-  ]);
+  });
 }
 
 function sleepForm(ctx, record) {
   return h("form", {
-    class: "card",
+    class: "sheet-form",
     onSubmit: async (event) => {
       event.preventDefault();
       const result = await ctx.actions.saveSleepManual({
