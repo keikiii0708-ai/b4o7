@@ -192,13 +192,98 @@ function paint() {
     ]) : null,
     modal ? renderModal(modal, () => { modal = null; paint(); }) : null,
   ]);
+  const sameRoute = paint.routeKey === location.hash;
+  const saved = sameRoute ? captureView(app) : null;
   app.replaceChildren(shell);
   const sheetOpen = route.name === "goal-edit" || route.name === "sleep-day" || route.name === "review";
   document.body.classList.toggle("modal-open", Boolean(modal) || sheetOpen);
-  if (paint.routeKey !== location.hash) {
+  if (!sameRoute) {
     paint.routeKey = location.hash;
+    paint.sheets = new Set();
     window.scrollTo(0, 0);
   }
+  paint.sheets = restoreView(app, saved, paint.sheets || new Set());
+}
+
+// A repaint rebuilds the whole DOM. Keep scroll offsets, focus, and open sheets
+// steady so picking an option does not throw the page back to the top.
+const STATE_CLASSES = new Set(["on", "active"]);
+
+function signature(el) {
+  // Ignore selection classes so a button keeps its key when it becomes "on".
+  const classes = [...el.classList].filter((name) => !STATE_CLASSES.has(name)).sort();
+  return `${el.tagName}${classes.length ? `.${classes.join(".")}` : ""}`;
+}
+
+// Walk the tree once and give each element a structural key that survives a rebuild.
+function keyIndex(root) {
+  const byKey = new Map();
+  const byNode = new Map();
+  const walk = (parent, prefix) => {
+    const counts = new Map();
+    for (const el of parent.children) {
+      const sig = signature(el);
+      const n = counts.get(sig) || 0;
+      counts.set(sig, n + 1);
+      const key = el.dataset?.scrollKey ? `#${el.dataset.scrollKey}` : `${prefix}>${sig}:${n}`;
+      byKey.set(key, el);
+      byNode.set(el, key);
+      if (el.children.length) walk(el, key);
+    }
+  };
+  walk(root, "");
+  return { byKey, byNode };
+}
+
+function captureView(root) {
+  const scrolls = new Map();
+  const { byNode } = keyIndex(root);
+  for (const [el, key] of byNode) {
+    if (el.scrollTop || el.scrollLeft) scrolls.set(key, [el.scrollTop, el.scrollLeft]);
+  }
+  const active = document.activeElement;
+  let focus = null;
+  if (active && active !== document.body && root.contains(active)) {
+    focus = { key: byNode.get(active), tag: active.tagName, name: active.getAttribute("name"), label: active.getAttribute("aria-label") };
+    try {
+      if (typeof active.selectionStart === "number") focus.selection = [active.selectionStart, active.selectionEnd, active.selectionDirection];
+    } catch { /* inputs without selection support */ }
+  }
+  return { x: window.scrollX, y: window.scrollY, scrolls, focus };
+}
+
+function restoreView(root, saved, previousSheets) {
+  const sheets = new Set();
+  const { byKey: index, byNode } = keyIndex(root);
+  for (const el of root.querySelectorAll(".sheet-back")) {
+    const key = byNode.get(el);
+    sheets.add(key);
+    // Do not replay the slide-in animation for a sheet that was already open.
+    if (saved && previousSheets.has(key)) {
+      el.style.animation = "none";
+      el.querySelector(".sheet")?.style.setProperty("animation", "none");
+    }
+  }
+  if (!saved) return sheets;
+  for (const [key, [top, left]] of saved.scrolls) {
+    const el = index.get(key);
+    if (el) { el.scrollTop = top; el.scrollLeft = left; }
+  }
+  if (window.scrollX !== saved.x || window.scrollY !== saved.y) window.scrollTo(saved.x, saved.y);
+  if (saved.focus) {
+    let target = index.get(saved.focus.key);
+    if (!target || target.tagName !== saved.focus.tag) {
+      target = [...root.querySelectorAll(saved.focus.tag)].find((el) => (saved.focus.name && el.getAttribute("name") === saved.focus.name)
+        || (saved.focus.label && el.getAttribute("aria-label") === saved.focus.label)) || null;
+    }
+    if (target && typeof target.focus === "function") {
+      try {
+        target.focus({ preventScroll: true });
+        if (saved.focus.selection && typeof target.setSelectionRange === "function") target.setSelectionRange(...saved.focus.selection);
+      } catch { /* focus is best effort */ }
+    }
+  }
+  return sheets;
 }
 
 function titleFor(name) {
