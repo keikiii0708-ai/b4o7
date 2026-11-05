@@ -193,7 +193,8 @@ function paint() {
     modal ? renderModal(modal, () => { modal = null; paint(); }) : null,
   ]);
   app.replaceChildren(shell);
-  document.body.classList.toggle("modal-open", Boolean(modal));
+  const sheetOpen = route.name === "goal-edit" || route.name === "sleep-day" || route.name === "review";
+  document.body.classList.toggle("modal-open", Boolean(modal) || sheetOpen);
   if (paint.routeKey !== location.hash) {
     paint.routeKey = location.hash;
     window.scrollTo(0, 0);

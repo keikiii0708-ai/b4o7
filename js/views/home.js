@@ -30,32 +30,34 @@ function rank(result) {
 }
 
 function homeEmpty(ctx) {
-  return h("section", { class: "empty" }, [
+  return h("section", { class: "empty hero-empty" }, [
+    h("img", { class: "brand-hero", src: "./icons/favicon.svg", alt: "", width: "96", height: "96" }),
     h("p", { class: "slogan", text: "WIN 4. OWN YOUR WEEK." }),
     h("h2", { text: "A week is like a 7 game series." }),
     h("p", { class: "muted", text: "All you gotta do is win 4 days." }),
-    h("div", { class: "stack", style: { marginTop: "18px" } }, [
-      h("button", { class: "btn primary block", onClick: () => ctx.go("/goals/new") }, "Add a goal"),
-    ]),
+    h("button", { class: "btn primary block", onClick: () => ctx.go("/goals/new") }, "Add a goal"),
   ]);
 }
 
 function homeFilled(ctx, ranked) {
   const review = reviewPrompt(ctx);
+  const [lead, ...rest] = ranked;
+  const card = (goal, week, featured) => seriesCard({
+    goal,
+    week,
+    weekStartsOn: ctx.state.settings.weekStartsOn,
+    featured,
+    onOpen: () => ctx.go(`/goals/${goal.id}`),
+    footer: h("div", { class: featured ? "hero-action" : "spread series-foot" }, [
+      h("span", { class: "hint", text: actionHint(goal, week) }),
+      renderTodayAction(ctx, goal, week),
+    ]),
+  });
   return h("div", { class: "home-grid" }, [
-    h("section", {}, [
-      h("p", { class: "eyebrow", text: "This week" }),
-      h("div", { class: "stack" }, ranked.map(({ goal, week }, index) => seriesCard({
-        goal,
-        week,
-        weekStartsOn: ctx.state.settings.weekStartsOn,
-        featured: index === 0,
-        onOpen: () => ctx.go(`/goals/${goal.id}`),
-        footer: h("div", { class: "spread", style: { padding: "10px 8px 0" } }, [
-          h("span", { class: "hint", text: actionHint(goal, week) }),
-          renderTodayAction(ctx, goal, week),
-        ]),
-      }))),
+    h("section", { class: "home-primary" }, [
+      card(lead.goal, lead.week, true),
+      rest.length ? h("p", { class: "eyebrow", text: "Also this week" }) : null,
+      rest.length ? h("div", { class: "stack" }, rest.map(({ goal, week }) => card(goal, week, false))) : null,
     ]),
     h("div", { class: "side" }, [
       h("p", { class: "eyebrow", text: "Today" }),
@@ -148,7 +150,7 @@ function journalCard(ctx) {
   return h("section", {}, [
     h("p", { class: "eyebrow", text: "Today's log" }),
     h("div", { class: "card" }, [
-      h("h2", { class: "goal-name", text: "A LITTLE NOTE ABOUT TODAY" }),
+      h("h2", { class: "note-label", text: "A little note about today" }),
       editing ? journalEditor(ctx, entry) : journalRead(ctx, entry),
     ]),
   ]);

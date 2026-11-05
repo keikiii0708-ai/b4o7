@@ -2,13 +2,14 @@ import { addDays, formatMonthYear, formatPrettyDate, formatRange, monthGrid, shi
 import { goalStats, monthDaysForGoal, performanceForMonth } from "../selectors.js";
 import { sleepSessionForDate, evaluateSleep } from "../sleep.js";
 import { buildGoalWeek } from "../selectors.js";
-import { MOODS, calendar, formatPercent, h, monthSwitcher, topbar } from "../ui.js";
+import { MOODS, calendar, formatPercent, h, monthSwitcher, progressRing, sheetFrame, topbar } from "../ui.js";
 import { statusLabel } from "../scoring.js";
 
 export function renderHistory(ctx) {
   if (ctx.route.name === "day") return renderDay(ctx);
-  if (ctx.route.name === "review") return renderReview(ctx);
-  return renderHistoryHome(ctx);
+  const home = renderHistoryHome(ctx);
+  if (ctx.route.name === "review") return h("div", {}, [home, renderReview(ctx)]);
+  return home;
 }
 
 function renderHistoryHome(ctx) {
@@ -59,6 +60,7 @@ function goalHistory(ctx, goal, month) {
       class: "list-row",
       onClick: () => ctx.go(`/history/review/${week.weekStart}`),
     }, [
+      progressRing(week.dayStates, { size: 32, hidden: true }),
       h("span", { class: "grow" }, [
         h("strong", { text: `${week.meta.label}  ${week.result.score}` }),
         h("span", { class: "sub", text: `${formatRange(week.weekStart, week.weekEnd)} · ${statusLabel(week.result.status)}` }),
@@ -75,7 +77,7 @@ function renderDay(ctx) {
   return h("div", {}, [
     topbar({ title: formatPrettyDate(date), onBack: () => ctx.go("/history"), onSettings: () => ctx.go("/settings") }),
     h("section", { class: "card" }, [
-      h("h2", { class: "goal-name", text: "A LITTLE NOTE ABOUT TODAY" }),
+      h("h2", { class: "note-label", text: "A little note about today" }),
       dayNote(ctx, date, entry),
     ]),
     h("p", { class: "eyebrow", text: "Sleep" }),
@@ -190,14 +192,18 @@ function renderReview(ctx) {
   ctx.memory.reviewDraft = draft;
   const goal = ctx.state.goals[0];
   const sample = goal ? buildGoalWeek(goal, ctx.state, weekStart, ctx.today, ctx.now) : null;
-  return h("form", {
-    onSubmit: async (event) => {
-      event.preventDefault();
-      await ctx.actions.saveReview({ ...draft, weekEnd, skipped: false });
-      ctx.go("/history");
-    },
-  }, [
-    topbar({ title: "Weekly review", date: formatRange(weekStart, weekEnd), onBack: () => ctx.go("/history") }),
+  return sheetFrame({
+    title: "Weekly review",
+    onClose: () => ctx.go("/history"),
+    children: h("form", {
+      class: "sheet-form",
+      onSubmit: async (event) => {
+        event.preventDefault();
+        await ctx.actions.saveReview({ ...draft, weekEnd, skipped: false });
+        ctx.go("/history");
+      },
+    }, [
+    h("p", { class: "hint", text: formatRange(weekStart, weekEnd) }),
     sample ? h("p", { class: "hint", text: "Each goal keeps its own result. This note is private and does not change a score." }) : null,
     area("What went well?", "wentWell", draft),
     area("What held you back?", "heldBack", draft),
@@ -214,7 +220,8 @@ function renderReview(ctx) {
         },
       }, "Skip for now"),
     ]),
-  ]);
+    ]),
+  });
 }
 
 function area(label, key, draft) {
