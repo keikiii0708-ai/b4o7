@@ -1,4 +1,5 @@
 import { STORE_NAMES } from "./db.js";
+import { t } from "./i18n.js";
 import { evaluateSleep } from "./sleep.js";
 import { listWeeks } from "./selectors.js";
 
@@ -17,26 +18,26 @@ const ARRAY_FIELDS = [
 ];
 
 export function validateBackup(data) {
-  if (!data || typeof data !== "object" || Array.isArray(data)) return "That file is not a B4O7 backup.";
-  if (data.app !== "B4O7") return "That file is not a B4O7 backup.";
-  if (typeof data.version !== "number") return "The backup is missing a version.";
+  if (!data || typeof data !== "object" || Array.isArray(data)) return t("backupError.notBackup");
+  if (data.app !== "B4O7") return t("backupError.notBackup");
+  if (typeof data.version !== "number") return t("backupError.version");
   for (const field of ARRAY_FIELDS) {
-    if (data[field] != null && !Array.isArray(data[field])) return `The backup field “${field}” is not a list.`;
+    if (data[field] != null && !Array.isArray(data[field])) return t("backupError.field", { field });
   }
   for (const goal of data.goals || []) {
     if (!goal || typeof goal.id !== "string" || !String(goal.name || "").trim()) {
-      return "A goal in the backup is missing a name.";
+      return t("backupError.goalName");
     }
     if (goal.weeklyTarget != null) {
       const target = Number(goal.weeklyTarget);
-      if (!Number.isInteger(target) || target < 1 || target > 7) return `“${goal.name}” has a target outside 1–7.`;
+      if (!Number.isInteger(target) || target < 1 || target > 7) return t("backupError.target", { name: goal.name });
     }
   }
   for (const image of data.images || []) {
-    if (!image?.id || typeof image.dataBase64 !== "string") return "A photo in the backup could not be read.";
+    if (!image?.id || typeof image.dataBase64 !== "string") return t("backupError.photo");
   }
   for (const sleep of data.sleepRecords || []) {
-    if (!sleep?.id) return "A sleep record in the backup is missing an id.";
+    if (!sleep?.id) return t("backupError.sleepId");
   }
   return "";
 }
@@ -55,7 +56,7 @@ export async function buildBackup(state) {
     app: "B4O7",
     version: BACKUP_VERSION,
     exportedAt: new Date().toISOString(),
-    note: "Private B4O7 backup. This file contains your data. Keep it off the public web.",
+    note: "Private B4O7 backup. This file contains your data. Keep it off the public web. 这是 B4O7 的私人备份，内含你的数据。不要把它放到公开网页上。",
     settings: state.settings,
     goals: state.goals,
     dailyRecords: state.dailyRecords,

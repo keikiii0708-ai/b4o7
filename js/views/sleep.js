@@ -1,4 +1,5 @@
 import { addDays, formatMonthYear, formatPrettyDate, localParts, monthGrid, shiftMonth, weekDayLetters } from "../dates.js";
+import { displayDuration, intlLocale, t } from "../i18n.js";
 import { sleepCalendarMark, sleepSessionForDate, evaluateSleep, findOpenSleep } from "../sleep.js";
 import { calendar, field, h, monthSwitcher, sheetFrame, showToast, topbar } from "../ui.js";
 
@@ -17,26 +18,26 @@ function renderSleepHome(ctx) {
   ctx.memory.sleepMonth = month;
   const cells = monthGrid(month.year, month.month, ctx.state.settings.weekStartsOn);
   return h("div", {}, [
-    topbar({ title: "Sleep", onSettings: () => ctx.go("/settings") }),
+    topbar({ title: t("title.sleep"), onSettings: () => ctx.go("/settings") }),
     h("div", { class: "sleep-hero" }, [
-      h("p", { class: "eyebrow", text: "Now" }),
+      h("p", { class: "eyebrow", text: t("sleep.now") }),
       h("p", { class: "clock-xl", dataset: { clock: "1" }, text: localParts(new Date(), ctx.zone).hhmm }),
-      h("p", { class: "hint", text: open ? "A night is open." : ctx.zone }),
+      h("p", { class: "hint", text: open ? t("sleep.nightOpen") : ctx.zone }),
     ]),
     open ? awakePanel(ctx, open) : h("button", {
       class: "sleep-cta",
       onClick: async () => {
         const result = await ctx.actions.sleepBed();
         if (!result.ok) {
-          showToast("A bedtime is already open. You can correct it.");
+          showToast(t("toast.bedtimeOpen"));
           ctx.go("/sleep/open");
         }
       },
-    }, "GO TO SLEEP"),
+    }, t("sleep.goToSleep")),
     latestCard(ctx),
-    h("p", { class: "eyebrow", text: "Targets" }),
+    h("p", { class: "eyebrow", text: t("sleep.targets") }),
     targetsForm(ctx),
-    h("p", { class: "eyebrow", text: "Month" }),
+    h("p", { class: "eyebrow", text: t("sleep.month") }),
     monthSwitcher(formatMonthYear(month.year, month.month), () => {
       ctx.memory.sleepMonth = shiftMonth(month.year, month.month, -1);
       ctx.draw();
@@ -51,8 +52,8 @@ function renderSleepHome(ctx) {
       marks: (date) => sleepCalendarMark(sleepSessionForDate(ctx.state.sleepRecords, date), date, ctx.today),
       onPick: (date) => ctx.go(`/sleep/${date}`),
     }),
-    h("p", { class: "hint", text: "Green passed, red missed a target, grey is unfinished, empty has no record." }),
-    h("button", { class: "btn ghost block", style: { marginTop: "12px" }, onClick: () => ctx.go(`/sleep/${ctx.today}`) }, "Add or correct a night"),
+    h("p", { class: "hint", text: t("sleep.legend") }),
+    h("button", { class: "btn ghost block", style: { marginTop: "12px" }, onClick: () => ctx.go(`/sleep/${ctx.today}`) }, t("sleep.addNight")),
   ]);
 }
 
@@ -61,39 +62,58 @@ function awakePanel(ctx, open) {
     hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: open.bedtimeTz || ctx.zone,
   }).format(new Date(open.bedtimeUtc));
   return h("div", { class: "sleep-awake" }, [
-    h("p", { class: "hint", text: `In bed since ${label} · ${open.bedtimeOffset || ""} ${open.bedtimeTz || ""}`.replace(/\s+/g, " ").trim() }),
+    h("p", { class: "hint", text: `${t("home.inBed", { time: label })} · ${open.bedtimeOffset || ""} ${open.bedtimeTz || ""}`.replace(/\s+/g, " ").trim() }),
     h("button", {
       class: "sleep-cta",
       onClick: async () => {
         const result = await ctx.actions.sleepWake();
         if (!result.ok) {
-          showToast(result.reason === "wake-date" ? "This wake-up date already has a night." : "Wake time was not saved.");
+          showToast(result.reason === "wake-date" ? t("sleep.wakeHasNight") : t("toast.wakeNotSaved"));
           if (result.existing?.wakeDate) ctx.go(`/sleep/${result.existing.wakeDate}`);
         }
       },
-    }, "I'M AWAKE"),
-    h("button", { class: "btn ghost block", onClick: () => ctx.go("/sleep/open") }, "Correct bedtime"),
+    }, t("home.awake")),
+    h("button", { class: "btn ghost block", onClick: () => ctx.go("/sleep/open") }, t("sleep.correctBedtime")),
   ]);
 }
 
 function latestCard(ctx) {
   const latest = [...ctx.state.sleepRecords].filter((record) => record.wakeDate).sort((a, b) => (a.wakeDate < b.wakeDate ? 1 : -1))[0];
-  if (!latest) return h("p", { class: "hint", style: { marginTop: "14px" }, text: "A night is attributed to the morning you wake up." });
+  if (!latest) return h("p", { class: "hint", style: { marginTop: "14px" }, text: t("sleep.attributedHint") });
   const evaluation = evaluateSleep(latest);
   return h("button", { class: "card", style: { width: "100%", textAlign: "left", marginTop: "14px" }, onClick: () => ctx.go(`/sleep/${latest.wakeDate}`) }, [
-    h("p", { class: "hint", text: "Last recorded interval" }),
-    h("p", { class: "big-time", text: evaluation.durationLabel || "Incomplete" }),
-    h("p", { class: "hint", text: "Recorded interval, not a medical measure." }),
+    h("p", { class: "hint", text: t("sleep.lastInterval") }),
+    h("p", { class: "big-time", text: displayDuration(evaluation.durationLabel) || t("home.incomplete") }),
+    h("p", { class: "hint", text: t("sleep.notMedical") }),
     checks(evaluation),
   ]);
 }
 
 function checks(evaluation) {
-  if (!evaluation.checks?.length) return h("p", { class: "hint", text: evaluation.win ? "No extra targets were on." : "" });
+  if (!evaluation.checks?.length) return h("p", { class: "hint", text: evaluation.win ? t("sleep.noExtra") : "" });
   return h("div", { class: "checks" }, evaluation.checks.map((check) => h("div", { class: "check" }, [
-    h("span", { text: `${check.label} · ${check.detail}` }),
-    h("span", { class: check.passed ? "passed" : "unmet", text: check.passed ? "Passed" : "Not met" }),
+    h("span", { text: `${checkLabel(check)} · ${checkDetail(check)}` }),
+    h("span", { class: check.passed ? "passed" : "unmet", text: check.passed ? t("sleep.passed") : t("sleep.notMet") }),
   ])));
+}
+
+function checkLabel(check) {
+  if (check.id === "bedtime") return t("sleep.checkBedtime");
+  if (check.id === "wake") return t("sleep.checkWake");
+  if (check.id === "duration") return t("sleep.checkDuration");
+  return check.label;
+}
+
+function checkDetail(check) {
+  if (check.id !== "duration") return check.detail;
+  return durationPhrase(check.detail);
+}
+
+function durationPhrase(detail) {
+  const match = /^(\d+)h(?: (\d+)m)?$/.exec(detail || "");
+  if (!match) return detail;
+  if (match[2] == null) return t("duration.h", { hours: Number(match[1]) });
+  return t("duration.hm", { hours: Number(match[1]), minutes: Number(match[2]) });
 }
 
 function targetsForm(ctx) {
@@ -102,28 +122,30 @@ function targetsForm(ctx) {
     await ctx.actions.updateSettings({ sleepTargets: { ...targets, ...partial } });
   };
   return h("div", { class: "card" }, [
-    toggleRow("Latest bedtime", targets.latestBedtimeEnabled, (enabled) => patch({ latestBedtimeEnabled: enabled })),
+    toggleRow(t("sleep.latestBedtime"), targets.latestBedtimeEnabled, (enabled) => patch({ latestBedtimeEnabled: enabled })),
     targets.latestBedtimeEnabled ? h("input", {
       type: "time",
+      lang: intlLocale(),
       value: targets.latestBedtime,
-      "aria-label": "Latest bedtime",
+      "aria-label": t("sleep.latestBedtime"),
       onChange: (event) => patch({ latestBedtime: event.target.value }),
     }) : null,
-    toggleRow("Latest wake", targets.latestWakeEnabled, (enabled) => patch({ latestWakeEnabled: enabled })),
+    toggleRow(t("sleep.latestWake"), targets.latestWakeEnabled, (enabled) => patch({ latestWakeEnabled: enabled })),
     targets.latestWakeEnabled ? h("input", {
       type: "time",
+      lang: intlLocale(),
       value: targets.latestWake,
-      "aria-label": "Latest wake",
+      "aria-label": t("sleep.latestWake"),
       onChange: (event) => patch({ latestWake: event.target.value }),
     }) : null,
-    toggleRow("Minimum time asleep is mandatory", targets.minDurationEnabled, (enabled) => patch({ minDurationEnabled: enabled })),
+    toggleRow(t("sleep.minMandatory"), targets.minDurationEnabled, (enabled) => patch({ minDurationEnabled: enabled })),
     targets.minDurationEnabled ? h("div", { class: "two" }, [
       h("input", {
         type: "number",
         min: "0",
         max: "23",
         inputmode: "numeric",
-        "aria-label": "Hours",
+        "aria-label": t("sleep.hours"),
         value: String(Math.floor((targets.minDurationMinutes || 0) / 60)),
         onChange: (event) => patch({ minDurationMinutes: Number(event.target.value) * 60 + ((targets.minDurationMinutes || 0) % 60) }),
       }),
@@ -132,12 +154,12 @@ function targetsForm(ctx) {
         min: "0",
         max: "59",
         inputmode: "numeric",
-        "aria-label": "Minutes",
+        "aria-label": t("sleep.minutes"),
         value: String((targets.minDurationMinutes || 0) % 60),
         onChange: (event) => patch({ minDurationMinutes: Math.floor((targets.minDurationMinutes || 0) / 60) * 60 + Number(event.target.value) }),
       }),
     ]) : null,
-    h("p", { class: "hint", text: "A win needs every target that is switched on. Past nights keep the targets they were recorded with." }),
+    h("p", { class: "hint", text: t("sleep.targetsHint") }),
   ]);
 }
 
@@ -157,29 +179,29 @@ function renderSleepDay(ctx) {
     form = initialForm(ctx, record);
   }
   const evaluation = record?.wakeUtc ? evaluateSleep(record) : null;
-  const title = open ? "Open night" : formatPrettyDate(ctx.route.date);
+  const title = open ? t("sleep.openNight") : formatPrettyDate(ctx.route.date);
   return sheetFrame({
     title,
     onClose: () => ctx.go("/sleep"),
     children: record && !form.editing ? h("div", { class: "sheet-form" }, [
       h("div", { class: "time-pair" }, [
-        h("div", {}, [h("p", { class: "hint", text: "Bed" }), h("p", { class: "big-time", text: wall(record.bedtimeUtc, record.bedtimeTz) })]),
+        h("div", {}, [h("p", { class: "hint", text: t("sleep.bed") }), h("p", { class: "big-time", text: wall(record.bedtimeUtc, record.bedtimeTz) })]),
         h("span", { class: "arrow", text: "→" }),
-        h("div", {}, [h("p", { class: "hint", text: "Wake" }), h("p", { class: "big-time", text: record.wakeUtc ? wall(record.wakeUtc, record.wakeTz) : "—" })]),
+        h("div", {}, [h("p", { class: "hint", text: t("sleep.wake") }), h("p", { class: "big-time", text: record.wakeUtc ? wall(record.wakeUtc, record.wakeTz) : "—" })]),
       ]),
       h("p", { class: "hint", text: `${record.bedtimeOffset || ""} ${record.bedtimeTz || ""}`.trim() }),
-      evaluation ? h("p", { class: "big-time", style: { marginTop: "10px" }, text: evaluation.durationLabel || "Incomplete" }) : h("p", { class: "hint", text: "Incomplete. No duration is invented." }),
+      evaluation ? h("p", { class: "big-time", style: { marginTop: "10px" }, text: displayDuration(evaluation.durationLabel) || t("home.incomplete") }) : h("p", { class: "hint", text: t("sleep.incompleteNoInvent") }),
       evaluation ? checks(evaluation) : null,
       record.note ? h("p", { class: "note-body", text: record.note }) : null,
-      record.corrected ? h("p", { class: "hint", text: "Corrected" }) : null,
+      record.corrected ? h("p", { class: "hint", text: t("sleep.corrected") }) : null,
       h("div", { class: "correct-row" }, [
-        h("button", { class: "btn ghost small", onClick: () => { form.editing = true; ctx.draw(); } }, "Correct"),
+        h("button", { class: "btn ghost small", onClick: () => { form.editing = true; ctx.draw(); } }, t("sleep.correct")),
         h("button", {
           class: "btn danger small",
           onClick: () => ctx.confirm({
-            title: "Delete this night?",
-            text: "The sleep record is removed. A sleep goal will be scored again without it.",
-            confirmLabel: "Delete night",
+            title: t("sleep.deleteTitle"),
+            text: t("sleep.deleteText"),
+            confirmLabel: t("sleep.deleteNight"),
             danger: true,
             onConfirm: async () => {
               await ctx.actions.deleteSleep(record.id);
@@ -187,7 +209,7 @@ function renderSleepDay(ctx) {
               ctx.go("/sleep");
             },
           }),
-        }, "Delete"),
+        }, t("sleep.delete")),
       ]),
     ]) : sleepForm(ctx, record),
   });
@@ -208,30 +230,32 @@ function sleepForm(ctx, record) {
         timeZone: form.timeZone,
       });
       if (!result.ok) {
-        form.error = result.reason === "order"
-          ? "Wake time needs to be after bedtime."
-          : result.reason === "wake-date"
-            ? "That wake-up date already has a night."
-            : result.reason === "open"
-              ? "Finish or delete the open bedtime first."
-              : "Check the date and time.";
+        form.error = result.reason;
         ctx.draw();
         return;
       }
-      showToast(record?.wakeUtc ? "Corrected" : "Saved");
+      showToast(record?.wakeUtc ? t("toast.corrected") : t("toast.saved"));
       ctx.go(`/sleep/${result.record.wakeDate}`);
     },
   }, [
-    h("p", { class: "hint", text: `Times are read in ${form.timeZone}.` }),
-    form.error ? h("p", { class: "error", text: form.error }) : null,
-    field("Bed date", h("input", { type: "date", required: true, value: form.bedDate, onInput: (event) => { form.bedDate = event.target.value; } })),
-    field("Bed time", h("input", { type: "time", required: true, value: form.bedTime, onInput: (event) => { form.bedTime = event.target.value; } })),
-    field("Wake date", h("input", { type: "date", required: true, value: form.wakeDate, onInput: (event) => { form.wakeDate = event.target.value; } })),
-    field("Wake time", h("input", { type: "time", required: true, value: form.wakeTime, onInput: (event) => { form.wakeTime = event.target.value; } })),
-    field("Note", h("textarea", { placeholder: "Optional", value: form.note, onInput: (event) => { form.note = event.target.value; } })),
+    h("p", { class: "hint", text: t("sleep.timesIn", { zone: form.timeZone }) }),
+    form.error ? h("p", { class: "error", text: sleepFormError(form.error) }) : null,
+    field(t("sleep.bedDate"), h("input", { type: "date", lang: intlLocale(), required: true, value: form.bedDate, onInput: (event) => { form.bedDate = event.target.value; } })),
+    field(t("sleep.bedTime"), h("input", { type: "time", lang: intlLocale(), required: true, value: form.bedTime, onInput: (event) => { form.bedTime = event.target.value; } })),
+    field(t("sleep.wakeDate"), h("input", { type: "date", lang: intlLocale(), required: true, value: form.wakeDate, onInput: (event) => { form.wakeDate = event.target.value; } })),
+    field(t("sleep.wakeTime"), h("input", { type: "time", lang: intlLocale(), required: true, value: form.wakeTime, onInput: (event) => { form.wakeTime = event.target.value; } })),
+    field(t("sleep.note"), h("textarea", { placeholder: t("sleep.optional"), value: form.note, onInput: (event) => { form.note = event.target.value; } })),
     record?.targets ? h("p", { class: "hint", text: targetLine(record.targets) }) : null,
-    h("button", { class: "btn primary block", type: "submit", style: { marginTop: "12px" } }, record ? "Save correction" : "Save night"),
+    h("button", { class: "btn primary block", type: "submit", style: { marginTop: "12px" } }, record ? t("sleep.saveCorrection") : t("sleep.saveNight")),
   ]);
+}
+
+function sleepFormError(reason) {
+  if (reason === "order") return t("sleep.errorOrder");
+  if (reason === "wake-date") return t("sleep.errorWakeDate");
+  if (reason === "open") return t("sleep.errorOpen");
+  if (reason === "invalid") return t("sleep.errorInvalid");
+  return reason ? t("sleep.errorInvalid") : "";
 }
 
 function initialForm(ctx, record) {
@@ -261,14 +285,15 @@ function wall(utc, timeZone) {
 
 function targetLine(targets) {
   const parts = [];
-  if (targets.latestBedtimeEnabled) parts.push(`bed by ${targets.latestBedtime}`);
-  if (targets.latestWakeEnabled) parts.push(`wake by ${targets.latestWake}`);
+  if (targets.latestBedtimeEnabled) parts.push(t("sleep.bedBy", { time: targets.latestBedtime }));
+  if (targets.latestWakeEnabled) parts.push(t("sleep.wakeBy", { time: targets.latestWake }));
   if (targets.minDurationEnabled) {
     const hours = Math.floor(targets.minDurationMinutes / 60);
     const minutes = targets.minDurationMinutes % 60;
-    parts.push(`at least ${hours}h ${minutes}m`);
+    const length = minutes ? t("duration.hm", { hours, minutes }) : t("duration.h", { hours });
+    parts.push(t("sleep.atLeast", { length }));
   }
-  return parts.length ? `Targets stored with this night: ${parts.join(", ")}.` : "No extra targets were stored with this night.";
+  return parts.length ? t("sleep.targetsStored", { parts: parts.join(", ") }) : t("sleep.noTargetsStored");
 }
 
 function monthOf(iso) {

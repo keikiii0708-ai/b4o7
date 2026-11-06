@@ -1,4 +1,5 @@
 import { addDays, formatMonthYear, formatPrettyDate, formatRange, monthGrid, shiftMonth, weekDayLetters, weekMeta } from "../dates.js";
+import { displayDuration, historySummary, moodLabel, stateLabel, t, weekLabel } from "../i18n.js";
 import { goalStats, monthDaysForGoal, performanceForMonth } from "../selectors.js";
 import { sleepSessionForDate, evaluateSleep } from "../sleep.js";
 import { buildGoalWeek } from "../selectors.js";
@@ -18,11 +19,11 @@ function renderHistoryHome(ctx) {
   const month = ctx.memory.historyMonth || monthOf(ctx.today);
   ctx.memory.historyMonth = month;
   return h("div", {}, [
-    topbar({ title: "History", onSettings: () => ctx.go("/settings") }),
+    topbar({ title: t("title.history"), onSettings: () => ctx.go("/settings") }),
     goals.length ? h("div", { class: "chips" }, goals.map((goal) => h("button", {
       class: `chip${selected?.id === goal.id ? " on" : ""}`,
       onClick: () => ctx.go(`/history/${goal.id}`),
-    }, goal.name))) : h("p", { class: "muted", text: "History appears here after you add a goal." }),
+    }, goal.name))) : h("p", { class: "muted", text: t("history.empty") }),
     selected ? goalHistory(ctx, selected, month) : null,
   ]);
 }
@@ -35,12 +36,17 @@ function goalHistory(ctx, goal, month) {
   const recent = [...weeks].reverse().slice(0, 16);
   return h("div", {}, [
     h("div", { class: "stats", style: { marginTop: "16px" } }, [
-      stat(String(stats.totalWon), "Weeks won"),
-      stat(String(stats.totalLost), "Weeks closed"),
-      stat(formatPercent(stats.winRate), "Win rate"),
-      stat(String(stats.currentStreak), "Current streak"),
+      stat(String(stats.totalWon), t("goal.weeksWon")),
+      stat(String(stats.totalLost), t("goal.weeksClosed")),
+      stat(formatPercent(stats.winRate), t("history.winRate")),
+      stat(String(stats.currentStreak), t("goal.currentStreak")),
     ]),
-    h("p", { class: "hint", style: { marginTop: "8px" }, text: `Longest streak ${stats.longestStreak} · ${stats.totalSuccessfulDays} successful days · this month ${performance.wins} wins, ${performance.losses} losses` }),
+    h("p", { class: "hint", style: { marginTop: "8px" }, text: historySummary({
+      streak: stats.longestStreak,
+      days: stats.totalSuccessfulDays,
+      wins: performance.wins,
+      losses: performance.losses,
+    }) }),
     monthSwitcher(formatMonthYear(month.year, month.month), () => {
       ctx.memory.historyMonth = shiftMonth(month.year, month.month, -1);
       ctx.draw();
@@ -55,14 +61,14 @@ function goalHistory(ctx, goal, month) {
       marks: (date) => dayMap.get(date) || "none",
       onPick: (date) => ctx.go(`/history/day/${date}`),
     }),
-    h("p", { class: "eyebrow", text: "Series" }),
+    h("p", { class: "eyebrow", text: t("history.series") }),
     h("div", { class: "list" }, recent.map((week) => h("button", {
       class: "list-row",
       onClick: () => ctx.go(`/history/review/${week.weekStart}`),
     }, [
       progressRing(week.dayStates, { size: 32, hidden: true }),
       h("span", { class: "grow" }, [
-        h("strong", { text: `${week.meta.label}  ${week.result.score}` }),
+        h("strong", { text: `${weekLabel(week.meta.number)}  ${week.result.score}` }),
         h("span", { class: "sub", text: `${formatRange(week.weekStart, week.weekEnd)} · ${statusLabel(week.result.status)}` }),
       ]),
     ]))),
@@ -77,17 +83,17 @@ function renderDay(ctx) {
   return h("div", {}, [
     topbar({ title: formatPrettyDate(date), onBack: () => ctx.go("/history"), onSettings: () => ctx.go("/settings") }),
     h("section", { class: "card" }, [
-      h("h2", { class: "note-label", text: "A little note about today" }),
+      h("h2", { class: "note-label", text: t("home.noteLabel") }),
       dayNote(ctx, date, entry),
     ]),
-    h("p", { class: "eyebrow", text: "Sleep" }),
+    h("p", { class: "eyebrow", text: t("home.sleep") }),
     session.record ? h("button", { class: "list-row", onClick: () => ctx.go(`/sleep/${session.record.wakeDate || "open"}`) }, [
       h("span", { class: "grow" }, [
-        h("strong", { text: evaluation?.durationLabel || (session.open ? "Incomplete" : "Night") }),
-        h("span", { class: "sub", text: evaluation ? (evaluation.win ? "Targets passed" : "A target was missed") : "No duration yet" }),
+        h("strong", { text: displayDuration(evaluation?.durationLabel) || (session.open ? t("home.incomplete") : t("history.night")) }),
+        h("span", { class: "sub", text: evaluation ? (evaluation.win ? t("history.targetsPassed") : t("history.targetMissed")) : t("history.noDuration") }),
       ]),
-    ]) : h("p", { class: "muted", text: "No sleep record." }),
-    h("p", { class: "eyebrow", text: "Goals" }),
+    ]) : h("p", { class: "muted", text: t("history.noSleep") }),
+    h("p", { class: "eyebrow", text: t("title.goals") }),
     h("div", { class: "stack" }, ctx.state.goals.map((goal) => dayGoal(ctx, goal, date))),
     rewardLines(ctx, date),
   ]);
@@ -97,8 +103,8 @@ function dayNote(ctx, date, entry) {
   const editing = ctx.memory.dayNote?.date === date;
   if (!editing) {
     return h("div", {}, [
-      entry?.mood ? h("p", { class: "hint", text: entry.mood }) : null,
-      h("p", { class: entry ? "note-body" : "hint", text: entry?.body || "Write something about your day…" }),
+      entry?.mood ? h("p", { class: "hint", text: moodLabel(entry.mood) }) : null,
+      h("p", { class: entry ? "note-body" : "hint", text: entry?.body || t("home.notePlaceholder") }),
       h("div", { class: "correct-row" }, [
         h("button", {
           class: "btn ghost small",
@@ -106,16 +112,16 @@ function dayNote(ctx, date, entry) {
             ctx.memory.dayNote = { date, body: entry?.body || "", mood: entry?.mood || null };
             ctx.draw();
           },
-        }, entry ? "Edit" : "Add a note"),
-        entry ? h("button", { class: "btn ghost small", onClick: () => ctx.actions.deleteJournal(date) }, "Delete") : null,
+        }, entry ? t("goal.edit") : t("history.addNote")),
+        entry ? h("button", { class: "btn ghost small", onClick: () => ctx.actions.deleteJournal(date) }, t("goal.delete")) : null,
       ]),
     ]);
   }
   const draft = ctx.memory.dayNote;
   return h("div", {}, [
     h("textarea", {
-      "aria-label": "A little note about today",
-      placeholder: "Write something about your day…",
+      "aria-label": t("home.noteLabel"),
+      placeholder: t("home.notePlaceholder"),
       "data-live": "text",
       value: draft.body,
       onInput: (event) => { draft.body = event.target.value; },
@@ -127,7 +133,7 @@ function dayNote(ctx, date, entry) {
         draft.mood = draft.mood === mood ? null : mood;
         ctx.draw();
       },
-    }, mood))),
+    }, moodLabel(mood)))),
     h("div", { class: "correct-row" }, [
       h("button", {
         class: "btn primary small",
@@ -136,8 +142,8 @@ function dayNote(ctx, date, entry) {
           ctx.memory.dayNote = null;
           ctx.draw();
         },
-      }, "Save note"),
-      h("button", { class: "btn ghost small", onClick: () => { ctx.memory.dayNote = null; ctx.draw(); } }, "Close"),
+      }, t("home.saveNote")),
+      h("button", { class: "btn ghost small", onClick: () => { ctx.memory.dayNote = null; ctx.draw(); } }, t("action.close")),
     ]),
   ]);
 }
@@ -150,14 +156,14 @@ function dayGoal(ctx, goal, date) {
   return h("div", { class: "card" }, [
     h("div", { class: "spread" }, [
       h("strong", { text: `${goal.icon || ""} ${goal.name}`.trim() }),
-      h("span", { class: `pill ${state === "win" ? "win" : state === "loss" ? "loss" : ""}`, text: state }),
+      h("span", { class: `pill ${state === "win" ? "win" : state === "loss" ? "loss" : ""}`, text: stateLabel(state) }),
     ]),
-    record?.corrected ? h("p", { class: "hint", text: "Corrected" }) : null,
+    record?.corrected ? h("p", { class: "hint", text: t("sleep.corrected") }) : null,
     h("div", { class: "correct-row" }, [
-      ["win", "Win"],
-      ["loss", "Loss"],
-      ["neutral", "Rest"],
-      [null, "Clear"],
+      ["win", t("state.win")],
+      ["loss", t("state.loss")],
+      ["neutral", t("state.neutral")],
+      [null, t("history.clear")],
     ].map(([explicit, label]) => h("button", {
       class: `chip${record?.explicit === explicit ? " on" : ""}`,
       onClick: () => ctx.actions.setDayExplicit(goal.id, date, explicit),
@@ -169,10 +175,11 @@ function rewardLines(ctx, date) {
   const hits = ctx.state.rewardClaims.filter((claim) => claim.unlockedAt?.slice(0, 10) === date || claim.claimedAt?.slice(0, 10) === date);
   if (!hits.length) return null;
   return h("section", {}, [
-    h("p", { class: "eyebrow", text: "Rewards" }),
+    h("p", { class: "eyebrow", text: t("history.rewards") }),
     h("div", { class: "stack" }, hits.map((claim) => {
       const goal = ctx.state.goals.find((item) => item.id === claim.goalId);
-      return h("p", { text: `${goal?.name || "Goal"} · ${claim.reward?.name || "Reward"} · ${claim.claimedAt?.slice(0, 10) === date ? "claimed" : "unlocked"}` });
+      const verb = claim.claimedAt?.slice(0, 10) === date ? t("history.claimed") : t("history.unlocked");
+      return h("p", { text: `${goal?.name || t("history.goalFallback")} · ${claim.reward?.name || t("reward.fallback")} · ${verb}` });
     })),
   ]);
 }
@@ -193,7 +200,7 @@ function renderReview(ctx) {
   const goal = ctx.state.goals[0];
   const sample = goal ? buildGoalWeek(goal, ctx.state, weekStart, ctx.today, ctx.now) : null;
   return sheetFrame({
-    title: "Weekly review",
+    title: t("home.review"),
     onClose: () => ctx.go("/history"),
     children: h("form", {
       class: "sheet-form",
@@ -204,13 +211,13 @@ function renderReview(ctx) {
       },
     }, [
     h("p", { class: "hint", text: formatRange(weekStart, weekEnd) }),
-    sample ? h("p", { class: "hint", text: "Each goal keeps its own result. This note is private and does not change a score." }) : null,
-    area("What went well?", "wentWell", draft),
-    area("What held you back?", "heldBack", draft),
-    area("What to improve next week?", "improve", draft),
-    h("p", { class: "hint", text: "Every question can stay empty." }),
+    sample ? h("p", { class: "hint", text: t("history.reviewNote") }) : null,
+    area(t("history.wentWell"), "wentWell", draft),
+    area(t("history.heldBack"), "heldBack", draft),
+    area(t("history.improve"), "improve", draft),
+    h("p", { class: "hint", text: t("history.canStayEmpty") }),
     h("div", { class: "stack", style: { marginTop: "14px" } }, [
-      h("button", { class: "btn primary block", type: "submit" }, "Save review"),
+      h("button", { class: "btn primary block", type: "submit" }, t("history.saveReview")),
       h("button", {
         class: "btn ghost block",
         type: "button",
@@ -218,7 +225,7 @@ function renderReview(ctx) {
           await ctx.actions.saveReview({ weekStart, weekEnd, wentWell: "", heldBack: "", improve: "", skipped: true });
           ctx.go("/history");
         },
-      }, "Skip for now"),
+      }, t("home.skip")),
     ]),
     ]),
   });

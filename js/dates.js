@@ -1,3 +1,5 @@
+import { getLocale, intlLocale } from "./i18n.js";
+
 /** Civil dates as YYYY-MM-DD. Day arithmetic uses the UTC calendar so DST cannot skip or repeat a date. */
 
 export function parseISODate(iso) {
@@ -54,11 +56,15 @@ export function isSameWeek(a, b, weekStartsOn) {
   return weekStartDate(a, weekStartsOn) === weekStartDate(b, weekStartsOn);
 }
 
-const LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
+const LETTERS = {
+  en: ["S", "M", "T", "W", "T", "F", "S"],
+  zh: ["日", "一", "二", "三", "四", "五", "六"],
+};
 
 export function weekDayLetters(weekStartsOn) {
+  const letters = getLocale() === "zh" ? LETTERS.zh : LETTERS.en;
   const start = weekStartsOn === "sunday" ? 0 : 1;
-  return Array.from({ length: 7 }, (_, i) => LETTERS[(start + i) % 7]);
+  return Array.from({ length: 7 }, (_, i) => letters[(start + i) % 7]);
 }
 
 export function weekMeta(iso, weekStartsOn) {
@@ -169,7 +175,7 @@ export function currentTimeZone() {
 
 export function formatPrettyDate(iso) {
   const { y, m, d } = parseISODate(iso);
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat(intlLocale(), {
     weekday: "long",
     day: "numeric",
     month: "long",
@@ -179,7 +185,7 @@ export function formatPrettyDate(iso) {
 
 export function formatShortDate(iso) {
   const { y, m, d } = parseISODate(iso);
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat(intlLocale(), {
     day: "numeric",
     month: "short",
     timeZone: "UTC",
@@ -191,7 +197,7 @@ export function formatRange(start, end) {
 }
 
 export function formatMonthYear(year, month) {
-  return new Intl.DateTimeFormat("en-GB", {
+  return new Intl.DateTimeFormat(intlLocale(), {
     month: "long",
     year: "numeric",
     timeZone: "UTC",

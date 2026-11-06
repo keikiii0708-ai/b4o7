@@ -1,4 +1,5 @@
 import { daysBetween, localParts, weekMeta } from "./dates.js";
+import { t } from "./i18n.js";
 import { buildGoalWeek } from "./selectors.js";
 
 export function dueReminder(state, today, zone, now = new Date(), seen = new Set()) {
@@ -20,7 +21,7 @@ export function dueReminder(state, today, zone, now = new Date(), seen = new Set
       key,
       goalId: goal.id,
       title: goal.name,
-      text: `${goal.name} is still open today.`,
+      text: t("reminder.open", { name: goal.name }),
     };
   }
   return null;

@@ -1,4 +1,5 @@
 import { addDays, formatPrettyDate, weekMeta } from "../dates.js";
+import { displayDuration, moodLabel, t } from "../i18n.js";
 import { shouldRemindBackup } from "../reminders.js";
 import { buildGoalWeek } from "../selectors.js";
 import { evaluateSleep, findOpenSleep } from "../sleep.js";
@@ -32,10 +33,10 @@ function rank(result) {
 function homeEmpty(ctx) {
   return h("section", { class: "empty hero-empty" }, [
     h("img", { class: "brand-hero", src: "./icons/favicon.svg", alt: "", width: "96", height: "96" }),
-    h("p", { class: "slogan", text: "WIN 4. OWN YOUR WEEK." }),
-    h("h2", { text: "A week is like a 7 game series." }),
-    h("p", { class: "muted", text: "All you gotta do is win 4 days." }),
-    h("button", { class: "btn primary block", onClick: () => ctx.go("/goals/new") }, "Add a goal"),
+    h("p", { class: "slogan", text: t("copy.own") }),
+    h("h2", { text: t("copy.series") }),
+    h("p", { class: "muted", text: t("copy.win4") }),
+    h("button", { class: "btn primary block", onClick: () => ctx.go("/goals/new") }, t("home.addGoal")),
   ]);
 }
 
@@ -56,11 +57,11 @@ function homeFilled(ctx, ranked) {
   return h("div", { class: "home-grid" }, [
     h("section", { class: "home-primary" }, [
       card(lead.goal, lead.week, true),
-      rest.length ? h("p", { class: "eyebrow", text: "Also this week" }) : null,
+      rest.length ? h("p", { class: "eyebrow", text: t("home.also") }) : null,
       rest.length ? h("div", { class: "stack" }, rest.map(({ goal, week }) => card(goal, week, false))) : null,
     ]),
     h("div", { class: "side" }, [
-      h("p", { class: "eyebrow", text: "Today" }),
+      h("p", { class: "eyebrow", text: t("home.today") }),
       h("div", { class: "list" }, ranked.map(({ goal, week }) => h("div", { class: "list-row" }, [
         h("span", { class: "emoji", text: goal.icon || "•" }),
         h("div", { class: "grow" }, [
@@ -73,7 +74,7 @@ function homeFilled(ctx, ranked) {
       journalCard(ctx),
       rewardPreview(ctx, ranked),
       review ? reviewCard(ctx, review) : null,
-      h("p", { class: "footer-line", text: "EVERY WEEK IS ANOTHER SERIES." }),
+      h("p", { class: "footer-line", text: t("copy.footer") }),
     ]),
   ]);
 }
@@ -82,18 +83,18 @@ function actionHint(goal, week) {
   if (goal.completionMethod === "threshold") {
     return `${week.snapshot.thresholdTarget ?? goal.thresholdTarget} ${week.snapshot.thresholdLabel || goal.thresholdLabel || ""}`.trim();
   }
-  if (goal.completionMethod === "timer") return `${week.snapshot.timerDurationMinutes || goal.timerDurationMinutes} min`;
-  if (goal.completionMethod === "sleep") return "From the sleep log";
-  return "One clear win";
+  if (goal.completionMethod === "timer") return t("home.minutes", { count: week.snapshot.timerDurationMinutes || goal.timerDurationMinutes });
+  if (goal.completionMethod === "sleep") return t("home.fromSleep");
+  return t("home.oneWin");
 }
 
 function dayLabel(week, today) {
   const state = week.dayStates[week.dates.indexOf(today)];
-  if (state === "win") return "Won today";
-  if (state === "loss") return "Closed for today";
-  if (state === "neutral") return "Rest day";
-  if (state === "pending") return "Still open today";
-  return "Upcoming";
+  if (state === "win") return t("home.wonToday");
+  if (state === "loss") return t("home.closedToday");
+  if (state === "neutral") return t("home.restDay");
+  if (state === "pending") return t("home.openToday");
+  return t("home.upcoming");
 }
 
 function sleepSummary(ctx) {
@@ -105,28 +106,28 @@ function sleepSummary(ctx) {
       ? new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: open.bedtimeTz || ctx.zone }).format(time)
       : "";
     body = h("div", {}, [
-      h("p", { class: "muted", text: `In bed since ${label}` }),
+      h("p", { class: "muted", text: t("home.inBed", { time: label }) }),
       h("p", { class: "hint", text: `${open.bedtimeOffset || ""} ${open.bedtimeTz || ""}`.trim() }),
-      h("button", { class: "btn primary block", style: { marginTop: "12px" }, onClick: () => ctx.actions.sleepWake().then(afterSleep(ctx)) }, "I'M AWAKE"),
+      h("button", { class: "btn primary block", style: { marginTop: "12px" }, onClick: () => ctx.actions.sleepWake().then(afterSleep(ctx)) }, t("home.awake")),
     ]);
   } else {
     const latest = [...ctx.state.sleepRecords].filter((record) => record.wakeUtc).sort((a, b) => (a.wakeDate < b.wakeDate ? 1 : -1))[0];
     if (!latest) {
-      body = h("p", { class: "muted", text: "No night recorded yet." });
+      body = h("p", { class: "muted", text: t("home.noNight") });
     } else {
       const evaluation = evaluateSleep(latest);
       body = h("div", {}, [
-        h("p", { class: "big-time", text: evaluation.durationLabel || "Incomplete" }),
-        h("p", { class: "hint", text: latest.wakeDate === ctx.today ? "Attributed to this morning" : `Wake date ${latest.wakeDate}` }),
-        h("p", { class: evaluation.win ? "hint" : "hint", text: evaluation.win ? "All targets passed" : "A target was missed" }),
+        h("p", { class: "big-time", text: displayDuration(evaluation.durationLabel) || t("home.incomplete") }),
+        h("p", { class: "hint", text: latest.wakeDate === ctx.today ? t("home.attributed") : t("home.wakeDate", { date: latest.wakeDate }) }),
+        h("p", { class: "hint", text: evaluation.win ? t("home.targetsPassed") : t("home.targetMissed") }),
       ]);
     }
   }
   return h("section", {}, [
-    h("p", { class: "eyebrow", text: "Sleep" }),
+    h("p", { class: "eyebrow", text: t("home.sleep") }),
     h("div", { class: "card" }, [
       body,
-      open ? null : h("button", { class: "btn ghost small", style: { marginTop: "10px" }, onClick: () => ctx.go("/sleep") }, "Open sleep"),
+      open ? null : h("button", { class: "btn ghost small", style: { marginTop: "10px" }, onClick: () => ctx.go("/sleep") }, t("home.openSleep")),
     ]),
   ]);
 }
@@ -138,19 +139,19 @@ function afterSleep(ctx) {
 }
 
 function sleepMessage(result) {
-  if (result?.reason === "wake-date") return "That wake-up date already has a night. Open it to correct it.";
-  if (result?.reason === "no-open") return "There is no bedtime to wake from yet.";
-  if (result?.reason === "open") return "A bedtime is already recorded.";
-  return "That night could not be saved.";
+  if (result?.reason === "wake-date") return t("sleep.errorWakeDateLong");
+  if (result?.reason === "no-open") return t("sleep.errorNoOpen");
+  if (result?.reason === "open") return t("sleep.errorAlreadyBed");
+  return t("sleep.errorGeneric");
 }
 
 function journalCard(ctx) {
   const entry = ctx.state.journal.find((item) => item.date === ctx.today);
   const editing = ctx.memory.journalEditing;
   return h("section", {}, [
-    h("p", { class: "eyebrow", text: "Today's log" }),
+    h("p", { class: "eyebrow", text: t("home.journal") }),
     h("div", { class: "card" }, [
-      h("h2", { class: "note-label", text: "A little note about today" }),
+      h("h2", { class: "note-label", text: t("home.noteLabel") }),
       editing ? journalEditor(ctx, entry) : journalRead(ctx, entry),
     ]),
   ]);
@@ -166,10 +167,10 @@ function journalRead(ctx, entry) {
         ctx.memory.journalDraft = { body: "", mood: null };
         ctx.draw();
       },
-    }, "Write something about your day…");
+    }, t("home.notePlaceholder"));
   }
   return h("div", {}, [
-    entry.mood ? h("p", { class: "hint", text: entry.mood }) : null,
+    entry.mood ? h("p", { class: "hint", text: moodLabel(entry.mood) }) : null,
     h("p", { class: "note-body", text: entry.body }),
     h("div", { class: "correct-row" }, [
       h("button", {
@@ -179,8 +180,8 @@ function journalRead(ctx, entry) {
           ctx.memory.journalDraft = { body: entry.body, mood: entry.mood };
           ctx.draw();
         },
-      }, "Edit"),
-      h("button", { class: "btn ghost small", onClick: () => ctx.actions.deleteJournal(ctx.today) }, "Delete"),
+      }, t("goal.edit")),
+      h("button", { class: "btn ghost small", onClick: () => ctx.actions.deleteJournal(ctx.today) }, t("goal.delete")),
     ]),
   ]);
 }
@@ -189,8 +190,8 @@ function journalEditor(ctx, entry) {
   const draft = ctx.memory.journalDraft || { body: entry?.body || "", mood: entry?.mood || null };
   return h("div", {}, [
     h("textarea", {
-      "aria-label": "A little note about today",
-      placeholder: "Write something about your day…",
+      "aria-label": t("home.noteLabel"),
+      placeholder: t("home.notePlaceholder"),
       "data-live": "text",
       value: draft.body,
       onInput: (event) => {
@@ -205,7 +206,7 @@ function journalEditor(ctx, entry) {
         ctx.memory.journalDraft = draft;
         ctx.draw();
       },
-    }, mood))),
+    }, moodLabel(mood)))),
     h("div", { class: "correct-row" }, [
       h("button", {
         class: "btn primary small",
@@ -214,14 +215,14 @@ function journalEditor(ctx, entry) {
           ctx.memory.journalEditing = false;
           ctx.draw();
         },
-      }, "Save note"),
+      }, t("home.saveNote")),
       h("button", {
         class: "btn ghost small",
         onClick: () => {
           ctx.memory.journalEditing = false;
           ctx.draw();
         },
-      }, "Close"),
+      }, t("action.close")),
     ]),
   ]);
 }
@@ -238,10 +239,10 @@ function rewardPreview(ctx, ranked) {
   if (unlocked.length) {
     const item = unlocked[unlocked.length - 1];
     card = h("div", { class: "card reward unlocked" }, [
-      h("p", { class: "status-line won", text: "UNLOCKED" }),
-      h("h2", { class: "goal-name", style: { marginTop: "6px" }, text: item.reward?.name || "Weekly reward" }),
+      h("p", { class: "status-line won", text: t("rewardStatus.unlocked") }),
+      h("h2", { class: "goal-name", style: { marginTop: "6px" }, text: item.reward?.name || t("home.weeklyReward") }),
       h("p", { class: "hint", text: `${item.goal.name}${item.reward?.priceLabel ? ` · ${item.reward.priceLabel}` : ""}` }),
-      h("button", { class: "btn primary block", style: { marginTop: "12px" }, onClick: () => ctx.go("/rewards") }, "View reward"),
+      h("button", { class: "btn primary block", style: { marginTop: "12px" }, onClick: () => ctx.go("/rewards") }, t("home.viewReward")),
     ]);
   } else {
     const closest = ranked
@@ -249,15 +250,15 @@ function rewardPreview(ctx, ranked) {
       .sort((a, b) => a.week.result.winsNeeded - b.week.result.winsNeeded)[0];
     if (!closest) return null;
     card = h("div", { class: "card" }, [
-      h("p", { class: "status-line", text: "LOCKED" }),
+      h("p", { class: "status-line", text: t("rewardStatus.locked") }),
       h("h2", { class: "goal-name", style: { marginTop: "6px" }, text: closest.week.snapshot.reward.name }),
       h("p", { class: "hint", text: closest.goal.name }),
       meter(closest.week.result.wins, closest.week.result.target),
-      h("p", { class: "copy", text: `${closest.week.result.winsNeeded} more ${closest.week.result.winsNeeded === 1 ? "win" : "wins"} this week.` }),
+      h("p", { class: "copy", text: t("home.moreWins", { count: closest.week.result.winsNeeded }) }),
     ]);
   }
   return h("section", {}, [
-    h("p", { class: "eyebrow", text: "Next reward" }),
+    h("p", { class: "eyebrow", text: t("home.nextReward") }),
     card,
   ]);
 }
@@ -277,16 +278,16 @@ function reviewPrompt(ctx) {
 
 function reviewCard(ctx, review) {
   return h("section", {}, [
-    h("p", { class: "eyebrow", text: "Weekly review" }),
+    h("p", { class: "eyebrow", text: t("home.review") }),
     h("div", { class: "card" }, [
-      h("h2", { class: "goal-name", text: "The series is ready for a look back." }),
-      h("p", { class: "hint", text: "Three questions. All of them can stay blank." }),
+      h("h2", { class: "goal-name", text: t("home.reviewTitle") }),
+      h("p", { class: "hint", text: t("home.reviewHint") }),
       h("div", { class: "correct-row" }, [
-        h("button", { class: "btn primary small", onClick: () => ctx.go(`/history/review/${review.weekStart}`) }, "Write review"),
+        h("button", { class: "btn primary small", onClick: () => ctx.go(`/history/review/${review.weekStart}`) }, t("home.writeReview")),
         h("button", {
           class: "btn ghost small",
           onClick: () => ctx.actions.saveReview({ ...review, wentWell: "", heldBack: "", improve: "", skipped: true }),
-        }, "Skip for now"),
+        }, t("home.skip")),
       ]),
     ]),
   ]);
@@ -296,19 +297,19 @@ function reminderBanner(ctx) {
   return h("div", { class: "banner spread" }, [
     h("div", {}, [
       h("strong", { text: ctx.reminder.title }),
-      h("p", { class: "hint", text: "Still open today. Reminders only appear while B4O7 is open." }),
+      h("p", { class: "hint", text: t("home.reminderHint") }),
     ]),
-    h("button", { class: "btn ghost small", onClick: ctx.dismissReminder }, "Dismiss"),
+    h("button", { class: "btn ghost small", onClick: ctx.dismissReminder }, t("action.dismiss")),
   ]);
 }
 
 function backupBanner(ctx) {
   return h("div", { class: "banner" }, [
-    h("strong", { text: "A quiet reminder to export a backup." }),
-    h("p", { class: "hint", text: "Your goals, sleep, and notes live only on this device." }),
+    h("strong", { text: t("home.backupTitle") }),
+    h("p", { class: "hint", text: t("home.backupHint") }),
     h("div", { class: "correct-row" }, [
-      h("button", { class: "btn primary small", onClick: () => ctx.actions.exportBackup() }, "Export backup"),
-      h("button", { class: "btn ghost small", onClick: () => ctx.actions.snoozeBackup(14) }, "Later"),
+      h("button", { class: "btn primary small", onClick: () => ctx.actions.exportBackup() }, t("home.exportBackup")),
+      h("button", { class: "btn ghost small", onClick: () => ctx.actions.snoozeBackup(14) }, t("action.later")),
     ]),
   ]);
 }

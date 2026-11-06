@@ -1,4 +1,5 @@
-import { weekDayLetters } from "./dates.js";
+import { formatPrettyDate, weekDayLetters } from "./dates.js";
+import { stateLabel, t } from "./i18n.js";
 import { statusLabel, timerStatus } from "./scoring.js";
 
 const urls = new Map();
@@ -118,7 +119,7 @@ export function progressRing(states, options = {}) {
   if (options.hidden) svg.setAttribute("aria-hidden", "true");
   else {
     svg.setAttribute("role", "img");
-    svg.setAttribute("aria-label", options.label || states.join(", "));
+    svg.setAttribute("aria-label", options.label || states.map((state) => stateLabel(state)).join(", "));
   }
   states.forEach((state, index) => {
     const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
@@ -151,7 +152,7 @@ export function sheetFrame({ title, onClose, children }) {
       h("div", { class: "sheet-grab", "aria-hidden": "true" }),
       h("header", { class: "sheet-head" }, [
         h("h2", { text: title }),
-        h("button", { class: "icon-btn", "aria-label": "Close", onClick: onClose }, [icon("close")]),
+        h("button", { class: "icon-btn", "aria-label": t("action.close"), onClick: onClose }, [icon("close")]),
       ]),
       children,
     ]),
@@ -167,7 +168,7 @@ export function field(label, control, hint) {
 }
 
 export function dots(states, letters) {
-  const label = states.map((state, index) => `${letters[index]} ${state}`).join(", ");
+  const label = states.map((state, index) => `${letters[index]} ${stateLabel(state)}`).join(", ");
   return h("div", { class: "week-dots" }, [
     h("div", { class: "dots", role: "img", "aria-label": label }, states.map((state) => h("span", { class: `dot ${state}` }))),
     h("div", { class: "dot-letters", "aria-hidden": "true" }, letters.map((letter) => h("span", { text: letter }))),
@@ -178,7 +179,7 @@ export function meter(wins, target) {
   const pct = target ? Math.min(100, Math.round((wins / target) * 100)) : 0;
   return h("div", { class: "meter-row" }, [
     h("div", { class: "meter", "aria-hidden": "true" }, [h("span", { style: { width: `${pct}%` } })]),
-    h("span", { class: "meter-label", text: `${wins} of ${target}` }),
+    h("span", { class: "meter-label", text: t("meter", { wins, target }) }),
   ]);
 }
 
@@ -217,14 +218,14 @@ export function seriesCard({ goal, week, weekStartsOn, featured, footer, onOpen 
 export function renderTodayAction(ctx, goal, week) {
   const index = week.dates.indexOf(ctx.today);
   const dayState = week.dayStates[index];
-  if (dayState === "neutral") return h("span", { class: "pill", text: "Rest" });
+  if (dayState === "neutral") return h("span", { class: "pill", text: t("state.neutral") });
   if (dayState === "win") {
     if (goal.completionMethod === "manual") {
-      return h("button", { class: "btn ghost small", onClick: () => ctx.actions.setDayExplicit(goal.id, ctx.today, null) }, "Undo");
+      return h("button", { class: "btn ghost small", onClick: () => ctx.actions.setDayExplicit(goal.id, ctx.today, null) }, t("action.undo"));
     }
-    return h("span", { class: "pill win", text: "Win" });
+    return h("span", { class: "pill win", text: t("state.win") });
   }
-  if (dayState === "loss") return h("span", { class: "pill loss", text: "Loss" });
+  if (dayState === "loss") return h("span", { class: "pill loss", text: t("state.loss") });
   if (goal.completionMethod === "timer") {
     const record = ctx.state.dailyRecords.find((item) => item.goalId === goal.id && item.date === ctx.today);
     const minutes = week.snapshot.timerDurationMinutes || goal.timerDurationMinutes || 25;
@@ -242,14 +243,14 @@ export function renderTodayAction(ctx, goal, week) {
           },
           text: formatClock(status.remainingMs),
         }),
-        h("button", { class: "btn ghost small", onClick: () => ctx.actions.cancelTimer(goal.id, ctx.today) }, "Cancel"),
+        h("button", { class: "btn ghost small", onClick: () => ctx.actions.cancelTimer(goal.id, ctx.today) }, t("action.cancel")),
       ]);
     }
-    return h("button", { class: "btn primary small", onClick: () => ctx.actions.startTimer(goal.id, ctx.today) }, `Start ${minutes}m`);
+    return h("button", { class: "btn primary small", onClick: () => ctx.actions.startTimer(goal.id, ctx.today) }, t("goal.startTimer", { minutes }));
   }
   if (goal.completionMethod === "threshold") {
     const record = ctx.state.dailyRecords.find((item) => item.goalId === goal.id && item.date === ctx.today);
-    const label = week.snapshot.thresholdLabel || goal.thresholdLabel || "Count";
+    const label = week.snapshot.thresholdLabel || goal.thresholdLabel || t("goal.countFallback");
     const target = week.snapshot.thresholdTarget ?? goal.thresholdTarget ?? "";
     return h("form", {
       class: "inline-form",
@@ -270,19 +271,19 @@ export function renderTodayAction(ctx, goal, week) {
         placeholder: String(target),
         "data-live": "text",
       }),
-      h("button", { type: "submit", class: "btn primary small" }, "Log"),
+      h("button", { type: "submit", class: "btn primary small" }, t("action.log")),
     ]);
   }
   if (goal.completionMethod === "sleep") {
-    return h("button", { class: "btn ghost small", onClick: () => ctx.go("/sleep") }, "Sleep");
+    return h("button", { class: "btn ghost small", onClick: () => ctx.go("/sleep") }, t("nav.sleep"));
   }
-  return h("button", { class: "btn primary small", onClick: () => ctx.actions.setDayExplicit(goal.id, ctx.today, "win") }, "Log win");
+  return h("button", { class: "btn primary small", onClick: () => ctx.actions.setDayExplicit(goal.id, ctx.today, "win") }, t("goal.logWin"));
 }
 
 export function topbar({ title, date, brand, onBack, onSettings }) {
   return h("header", { class: "topbar" }, [
     onBack
-      ? h("button", { class: "icon-btn", "aria-label": "Back", onClick: onBack }, [icon("back")])
+      ? h("button", { class: "icon-btn", "aria-label": t("action.back"), onClick: onBack }, [icon("back")])
       : null,
     h("div", { class: "topbar-copy" }, [
       brand ? h("div", { class: "brand-lockup" }, [
@@ -293,7 +294,7 @@ export function topbar({ title, date, brand, onBack, onSettings }) {
       date ? h("p", { class: "date-line", text: date }) : null,
     ]),
     onSettings
-      ? h("button", { class: "icon-btn", "aria-label": "Settings", "data-action": "settings", onClick: onSettings }, [icon("settings")])
+      ? h("button", { class: "icon-btn", "aria-label": t("action.settings"), "data-action": "settings", onClick: onSettings }, [icon("settings")])
       : h("span", { class: "icon-spacer" }),
   ]);
 }
@@ -342,13 +343,13 @@ export function renderModal(modal, close) {
     "data-action": "confirm-modal",
     disabled: Boolean(modal.typed),
     onClick: () => modal.onConfirm?.(),
-  }, modal.confirmLabel || "Confirm");
+  }, modal.confirmLabel || t("action.confirm"));
   const typed = modal.typed
     ? h("input", {
       type: "text",
       autocomplete: "off",
       autocapitalize: "characters",
-      "aria-label": `Type ${modal.typed}`,
+      "aria-label": t("confirm.type", { word: modal.typed }),
       "data-live": "text",
       onInput: (event) => {
         confirmBtn.disabled = event.target.value.trim() !== modal.typed;
@@ -361,10 +362,10 @@ export function renderModal(modal, close) {
     children: [
       modal.text ? h("p", { class: "muted", text: modal.text }) : null,
       modal.body || null,
-      typed ? field(`Type ${modal.typed} to confirm`, typed) : null,
+      typed ? field(t("confirm.type", { word: modal.typed }), typed) : null,
       h("div", { class: "stack tight sheet-actions" }, [
         modal.confirmLabel === null ? null : confirmBtn,
-        h("button", { class: "btn ghost block", onClick: close }, modal.cancelLabel || "Cancel"),
+        h("button", { class: "btn ghost block", onClick: close }, modal.cancelLabel || t("action.cancel")),
       ]),
     ],
   });
@@ -380,7 +381,7 @@ export function calendar({ cells, marks, today, onPick, letters }) {
       if (cell.date === today) classes.push("today");
       return h("button", {
         class: classes.join(" "),
-        "aria-label": `${cell.date} ${mark || "empty"}`,
+        "aria-label": `${formatPrettyDate(cell.date)}, ${stateLabel(mark || "empty")}`,
         onClick: () => onPick(cell.date),
       }, String(Number(cell.date.slice(8))));
     }),
@@ -389,8 +390,8 @@ export function calendar({ cells, marks, today, onPick, letters }) {
 
 export function monthSwitcher(label, onPrev, onNext) {
   return h("div", { class: "month-switch" }, [
-    h("button", { class: "icon-btn", "aria-label": "Previous month", onClick: onPrev }, [icon("back")]),
+    h("button", { class: "icon-btn", "aria-label": t("month.prev"), onClick: onPrev }, [icon("back")]),
     h("h2", { class: "month-label", text: label }),
-    h("button", { class: "icon-btn flip", "aria-label": "Next month", onClick: onNext }, [icon("back")]),
+    h("button", { class: "icon-btn flip", "aria-label": t("month.next"), onClick: onNext }, [icon("back")]),
   ]);
 }
