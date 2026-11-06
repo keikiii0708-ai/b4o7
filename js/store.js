@@ -1,4 +1,5 @@
 import { buildBackup, backupToRows, buildCsv, downloadFile, validateBackup } from "./backup.js";
+import { t } from "./i18n.js";
 import { addDays, captureStamp, currentTimeZone, offsetString, todayISO, weekMeta, zonedDateTimeToUtc } from "./dates.js";
 import * as db from "./db.js";
 import { buildDemo } from "./demo.js";
@@ -160,16 +161,16 @@ async function settleFinishedTimers() {
 export async function saveGoal(draft, milestones) {
   const config = validateGoalConfig({ weeklyTarget: Number(draft.weeklyTarget), restDays: draft.restDays });
   if (!config.ok) return { ok: false, reason: config.reason };
-  if (!String(draft.name || "").trim()) return { ok: false, reason: "Give the goal a name." };
+  if (!String(draft.name || "").trim()) return { ok: false, reason: t("error.goalName") };
   if (draft.completionMethod === "timer") {
     const minutes = Number(draft.timerDurationMinutes);
     if (!Number.isInteger(minutes) || minutes < 1 || minutes > 240) {
-      return { ok: false, reason: "Set the timer between 1 and 240 minutes." };
+      return { ok: false, reason: t("error.timerRange") };
     }
   }
   if (draft.completionMethod === "threshold") {
-    if (!String(draft.thresholdLabel || "").trim()) return { ok: false, reason: "Name what you are counting." };
-    if (!(Number(draft.thresholdTarget) > 0)) return { ok: false, reason: "Set a target above zero." };
+    if (!String(draft.thresholdLabel || "").trim()) return { ok: false, reason: t("error.countName") };
+    if (!(Number(draft.thresholdTarget) > 0)) return { ok: false, reason: t("error.countTarget") };
   }
   const existing = state.goals.find((goal) => goal.id === draft.id);
   const now = new Date().toISOString();

@@ -1,4 +1,4 @@
-const CACHE = "b4o7-v3";
+const CACHE = "b4o7-v4";
 
 const ASSETS = [
   "./",
@@ -6,6 +6,9 @@ const ASSETS = [
   "./manifest.webmanifest",
   "./css/app.css",
   "./js/main.js",
+  "./js/i18n.js",
+  "./js/locales/en.js",
+  "./js/locales/zh.js",
   "./js/dates.js",
   "./js/scoring.js",
   "./js/sleep.js",

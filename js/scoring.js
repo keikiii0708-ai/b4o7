@@ -1,19 +1,19 @@
 import { addDays, weekdayIndex, weekStartDate } from "./dates.js";
+import { t } from "./i18n.js";
 
 export function validateGoalConfig({ weeklyTarget, restDays }) {
   const target = Number(weeklyTarget);
   const unique = [...new Set((restDays || []).map((d) => Number(d)).filter((d) => d >= 0 && d <= 6))];
   const playable = 7 - unique.length;
   if (!Number.isInteger(target) || target < 1 || target > 7) {
-    return { ok: false, playable, restDays: unique, reason: "Weekly target must be a whole number from 1 to 7." };
+    return { ok: false, playable, restDays: unique, reason: t("error.targetRange") };
   }
   if (playable < target) {
-    const dayWord = playable === 1 ? "day" : "days";
     return {
       ok: false,
       playable,
       restDays: unique,
-      reason: `Rest days leave ${playable} playable ${dayWord}. A target of ${target} would be impossible. Remove a rest day or lower the target.`,
+      reason: t("error.restDays", { count: playable, target }),
     };
   }
   return { ok: true, playable, restDays: unique, reason: "" };
@@ -128,24 +128,20 @@ export function evaluateWeek({ states, target, today, weekEnd }) {
 
 export function seriesCopy(result) {
   if (result.status === "won") {
-    if (result.wins > result.target) {
-      return "SERIES WON. Extra wins still count. Progress over perfection.";
-    }
-    return "SERIES WON.";
+    if (result.wins > result.target) return t("series.wonExtra");
+    return t("series.won");
   }
   if (result.status === "lost") {
-    if (result.weekClosed) return "Series closed. Every week is another series.";
-    return "This series is out of reach. Every week is another series.";
+    if (result.weekClosed) return t("series.lostClosed");
+    return t("series.lostReach");
   }
-  const n = result.winsNeeded;
-  const word = n === 1 ? "chance" : "chances";
-  return `STILL IN THE GAME. You have ${n} more ${word} to reach your target.`;
+  return t("series.chances", { count: result.winsNeeded });
 }
 
 export function statusLabel(status) {
-  if (status === "won") return "SERIES WON";
-  if (status === "lost") return "SERIES CLOSED";
-  return "IN THE SERIES";
+  if (status === "won") return t("series.statusWon");
+  if (status === "lost") return t("series.statusLost");
+  return t("series.statusLive");
 }
 
 function rewardSnapshot(goal) {

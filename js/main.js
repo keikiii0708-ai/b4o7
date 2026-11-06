@@ -1,4 +1,5 @@
 import { localParts } from "./dates.js";
+import { applyDocumentLocale, onLocaleChange, t } from "./i18n.js";
 import { dueReminder, markReminderSeen, reminderSeen } from "./reminders.js";
 import {
   cancelTimer,
@@ -87,7 +88,7 @@ const actions = {
   sync,
   requestPersist: async () => {
     persistInfo = await askPersist();
-    showToast(persistInfo.persisted ? "This device will try to keep your data." : "The browser did not grant persistent storage.");
+    showToast(persistInfo.persisted ? t("toast.persistOn") : t("toast.persistOff"));
     paint();
   },
 };
@@ -157,7 +158,7 @@ function context() {
         try {
           onData(JSON.parse(await file.text()));
         } catch {
-          showToast("That file could not be read.");
+          showToast(t("error.file"));
         }
       });
       input.click();
@@ -181,14 +182,14 @@ function paint() {
     else view = renderSettings(ctx);
   } catch (error) {
     console.error(error);
-    view = h("p", { class: "error", text: "This screen hit a problem. Your data is still on the device." });
+    view = h("p", { class: "error", text: t("error.screen") });
   }
   const shell = h("div", { class: "app" }, [
     h("main", { class: "main", "data-view": route.name }, [view]),
     tabbar(),
     updateReady ? h("div", { class: "update-bar banner spread" }, [
-      h("span", { text: "A new version is ready." }),
-      h("button", { class: "btn primary small", onClick: reloadApp }, "Reload"),
+      h("span", { text: t("update.ready") }),
+      h("button", { class: "btn primary small", onClick: reloadApp }, t("action.reload")),
     ]) : null,
     modal ? renderModal(modal, () => { modal = null; paint(); }) : null,
   ]);
@@ -288,40 +289,40 @@ function restoreView(root, saved, previousSheets) {
 
 function titleFor(name) {
   const names = {
-    home: "Home",
-    goals: "Goals",
-    goal: "Goal",
-    "goal-edit": "Edit goal",
-    sleep: "Sleep",
-    "sleep-day": "Sleep",
-    rewards: "Rewards",
-    history: "History",
-    day: "Day",
-    review: "Review",
-    settings: "Settings",
+    home: "title.home",
+    goals: "title.goals",
+    goal: "title.goal",
+    "goal-edit": "title.goalEdit",
+    sleep: "title.sleep",
+    "sleep-day": "title.sleep",
+    rewards: "title.rewards",
+    history: "title.history",
+    day: "title.day",
+    review: "title.review",
+    settings: "title.settings",
   };
-  return `B4O7 · ${names[name] || "Home"}`;
+  return `B4O7 · ${t(names[name] || "title.home")}`;
 }
 
 function tabbar() {
   const tabs = [
-    ["home", "Home", "home"],
-    ["goals", "Goals", "goals"],
-    ["sleep", "Sleep", "moon"],
-    ["rewards", "Rewards", "gift"],
-    ["history", "History", "calendar"],
+    ["home", "nav.home", "home"],
+    ["goals", "nav.goals", "goals"],
+    ["sleep", "nav.sleep", "moon"],
+    ["rewards", "nav.rewards", "gift"],
+    ["history", "nav.history", "calendar"],
   ];
   const current = route.name === "goal" || route.name === "goal-edit" ? "goals"
     : route.name === "sleep-day" ? "sleep"
       : route.name === "day" || route.name === "review" ? "history"
         : route.name;
-  return h("nav", { class: "tabbar", "aria-label": "Main" }, [
+  return h("nav", { class: "tabbar", "aria-label": t("nav.main") }, [
     h("div", { class: "tabbar-inner" }, tabs.map(([id, label, glyph]) => h("button", {
       class: `tab${current === id ? " active" : ""}`,
       "data-tab": id,
       "aria-current": current === id ? "page" : null,
       onClick: () => go(`/${id}`),
-    }, [icon(glyph), label]))),
+    }, [icon(glyph), t(label)]))),
   ]);
 }
 
@@ -419,6 +420,10 @@ function startClock() {
 }
 
 async function main() {
+  applyDocumentLocale();
+  onLocaleChange(() => {
+    if (booted) paint();
+  });
   subscribe(schedulePaint);
   window.addEventListener("hashchange", onHash);
   try {
@@ -428,8 +433,8 @@ async function main() {
     console.error(error);
     document.querySelector("#app").replaceChildren(h("div", { class: "boot-error" }, [
       h("p", { class: "brand", text: "B4O7" }),
-      h("p", { text: "This browser could not open the on-device database." }),
-      h("p", { class: "hint", text: "Private mode on some browsers blocks storage. Open B4O7 in a normal Safari tab." }),
+      h("p", { text: t("error.database") }),
+      h("p", { class: "hint", text: t("error.privateMode") }),
     ]));
     return;
   }
