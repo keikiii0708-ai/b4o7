@@ -271,7 +271,7 @@ describe("numeric counters", () => {
 describe("precache", () => {
   it("bumps the service worker and caches every app script", () => {
     const sw = readFileSync(join(root, "sw.js"), "utf8");
-    assert.match(sw, /const CACHE = "b4o7-v6"/);
+    assert.match(sw, /const CACHE = "b4o7-v7"/);
     assert.doesNotMatch(sw, /b4o7-v4/);
     const assets = [...sw.matchAll(/"(\.\/[^"]+)"/g)].map((match) => match[1]);
     const files = [];

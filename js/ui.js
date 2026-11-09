@@ -327,7 +327,12 @@ export function renderTodayAction(ctx, goal, week) {
   }, t("goal.logWin")), goal.id, date, false);
 }
 
-export function topbar({ title, date, brand, onBack, onSettings }) {
+export function topbar({ title, date, brand, onBack, onSettings, trailing }) {
+  let end = h("span", { class: "icon-spacer" });
+  if (trailing) end = trailing;
+  else if (onSettings) {
+    end = h("button", { class: "icon-btn", "aria-label": t("action.settings"), "data-action": "settings", onClick: onSettings }, [icon("settings")]);
+  }
   return h("header", { class: "topbar" }, [
     onBack
       ? h("button", { class: "icon-btn", "aria-label": t("action.back"), onClick: onBack }, [icon("back")])
@@ -340,9 +345,7 @@ export function topbar({ title, date, brand, onBack, onSettings }) {
       title ? h("h1", { class: "page-title", text: title }) : null,
       date ? h("p", { class: "date-line", text: date }) : null,
     ]),
-    onSettings
-      ? h("button", { class: "icon-btn", "aria-label": t("action.settings"), "data-action": "settings", onClick: onSettings }, [icon("settings")])
-      : h("span", { class: "icon-spacer" }),
+    end,
   ]);
 }
 

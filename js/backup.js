@@ -1,9 +1,10 @@
 import { STORE_NAMES } from "./db.js";
 import { t } from "./i18n.js";
+import { normalizeNote } from "./notes.js";
 import { evaluateSleep } from "./sleep.js";
 import { listWeeks } from "./selectors.js";
 
-export const BACKUP_VERSION = 1;
+export const BACKUP_VERSION = 2;
 
 const ARRAY_FIELDS = [
   "goals",
@@ -15,6 +16,7 @@ const ARRAY_FIELDS = [
   "weekSnapshots",
   "rewardClaims",
   "images",
+  "notes",
 ];
 
 export function validateBackup(data) {
@@ -38,6 +40,16 @@ export function validateBackup(data) {
   }
   for (const sleep of data.sleepRecords || []) {
     if (!sleep?.id) return t("backupError.sleepId");
+  }
+  for (const note of data.notes || []) {
+    if (!note || typeof note.id !== "string" || !note.id.trim()) return t("backupError.noteId");
+    if (note.items != null && !Array.isArray(note.items)) return t("backupError.noteItems");
+    for (const item of note.items || []) {
+      if (!item || typeof item.id !== "string" || !item.id.trim()) return t("backupError.noteId");
+    }
+    if (note.countdownDate != null && note.countdownDate !== "" && !/^\d{4}-\d{2}-\d{2}$/.test(note.countdownDate)) {
+      return t("backupError.noteDate");
+    }
   }
   return "";
 }
@@ -66,6 +78,7 @@ export async function buildBackup(state) {
     weeklyReviews: state.weeklyReviews,
     weekSnapshots: state.weekSnapshots,
     rewardClaims: state.rewardClaims,
+    notes: state.notes || [],
     images,
   };
 }
@@ -78,7 +91,8 @@ export function backupToRows(backup) {
     blob: base64ToBlob(image.dataBase64, image.mime || "image/jpeg"),
   }));
   const settings = backup.settings ? { ...backup.settings, id: "app" } : null;
-  return { ...backup, images, settings };
+  const notes = (backup.notes || []).map(normalizeNote).filter(Boolean);
+  return { ...backup, images, settings, notes };
 }
 
 export function buildCsv(state, today) {
@@ -119,6 +133,21 @@ export function buildCsv(state, today) {
   }
   for (const entry of state.journal) {
     rows.push(["journal", entry.date, "", entry.mood || "", "", entry.body || "", ""]);
+  }
+  for (const note of state.notes || []) {
+    const lines = (note.items || [])
+      .filter((item) => item && String(item.text || "").trim())
+      .map((item) => `${item.checked ? "[x]" : "[ ]"} ${String(item.text).trim()}`);
+    const written = [note.body || "", ...lines].filter(Boolean).join("\n");
+    rows.push([
+      "note",
+      note.countdownDate || note.createdOn || String(note.createdAt || "").slice(0, 10),
+      note.title || "",
+      note.countdownDate ? "countdown" : "",
+      note.countdownDate || "",
+      written,
+      "",
+    ]);
   }
   for (const review of state.weeklyReviews) {
     rows.push([
