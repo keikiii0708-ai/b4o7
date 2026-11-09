@@ -130,10 +130,11 @@ describe("nav burst", () => {
     assert.equal(particleField(40).length, PARTICLE_LIMIT);
     assert.equal(particleField(0).length, 0);
     const sum = dots.reduce((acc, dot) => ({ x: acc.x + dot.x, y: acc.y + dot.y }), { x: 0, y: 0 });
-    assert.ok(Math.hypot(sum.x, sum.y) < 8);
+    assert.ok(Math.hypot(sum.x, sum.y) < 20);
     for (const dot of dots) {
-      assert.ok(Math.hypot(dot.x, dot.y) <= 16);
-      assert.ok(dot.size <= 3);
+      const radius = Math.hypot(dot.x, dot.y);
+      assert.ok(radius >= 20 && radius <= 32);
+      assert.ok(dot.size >= 3.5 && dot.size <= 4);
     }
     assert.ok(BURST_MS < 700);
     assert.equal(iconScale(0), 1);
@@ -270,7 +271,7 @@ describe("numeric counters", () => {
 describe("precache", () => {
   it("bumps the service worker and caches every app script", () => {
     const sw = readFileSync(join(root, "sw.js"), "utf8");
-    assert.match(sw, /const CACHE = "b4o7-v5"/);
+    assert.match(sw, /const CACHE = "b4o7-v6"/);
     assert.doesNotMatch(sw, /b4o7-v4/);
     const assets = [...sw.matchAll(/"(\.\/[^"]+)"/g)].map((match) => match[1]);
     const files = [];

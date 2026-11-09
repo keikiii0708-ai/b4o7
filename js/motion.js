@@ -86,11 +86,11 @@ export function particleField(count = 7) {
   const dots = [];
   for (let i = 0; i < n; i += 1) {
     const angle = (Math.PI * 2 * i) / n - Math.PI / 2;
-    const dist = 9 + (i % 3) * 2.4;
+    const dist = 22 + (i % 3) * 4;
     dots.push({
       x: Math.cos(angle) * dist,
       y: Math.sin(angle) * dist,
-      size: i % 2 === 0 ? 3 : 2.25,
+      size: i % 2 === 0 ? 4 : 3.5,
     });
   }
   return dots;
@@ -855,9 +855,10 @@ function ensureParticles(icon, elapsed) {
     layer.append(node);
     try {
       const anim = node.animate([
-        { transform: "translate(0px, 0px) scale(1)", opacity: 0.8 },
-        { transform: `translate(${dot.x}px, ${dot.y}px) scale(0.35)`, opacity: 0 },
-      ], { duration: BURST_MS, easing: "cubic-bezier(0.16, 0.72, 0.28, 1)", fill: "forwards" });
+        { transform: "translate(0px, 0px) scale(1)", opacity: 0.95, offset: 0 },
+        { transform: `translate(${dot.x * 0.82}px, ${dot.y * 0.82}px) scale(1)`, opacity: 0.9, offset: 0.62 },
+        { transform: `translate(${dot.x}px, ${dot.y}px) scale(0.6)`, opacity: 0, offset: 1 },
+      ], { duration: BURST_MS, easing: "linear", fill: "forwards" });
       anim.currentTime = elapsed;
       anims.push(anim);
     } catch {
