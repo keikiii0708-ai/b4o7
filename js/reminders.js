@@ -31,7 +31,8 @@ export function shouldRemindBackup(state, today) {
   const ownGoal = (state.goals || []).some((goal) => !goal.demo);
   const ownSleep = (state.sleepRecords || []).some((record) => !record.demo);
   const ownJournal = (state.journal || []).some((entry) => !entry.demo);
-  if (!ownGoal && !ownSleep && !ownJournal) return false;
+  const ownNotes = (state.notes || []).some((note) => !note.demo);
+  if (!ownGoal && !ownSleep && !ownJournal && !ownNotes) return false;
   if (state.settings?.backupSnoozeUntil && today <= state.settings.backupSnoozeUntil) return false;
   if (!state.settings?.lastBackupAt) {
     const created = String(state.settings?.createdAt || today).slice(0, 10);

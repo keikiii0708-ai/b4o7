@@ -8,6 +8,7 @@ import {
   deleteAllData,
   deleteGoal,
   deleteJournal,
+  deleteNote,
   deleteSleep,
   exportBackup,
   exportCsv,
@@ -21,6 +22,7 @@ import {
   saveGoal,
   saveImage,
   saveJournal,
+  saveNote,
   saveReview,
   saveSleepManual,
   setDayExplicit,
@@ -32,6 +34,7 @@ import {
   subscribe,
   sync,
   today,
+  toggleNoteItem,
   updateSettings,
   zone,
 } from "./store.js";
@@ -41,6 +44,7 @@ import { renderGoals } from "./views/goals.js";
 import { renderHistory } from "./views/history.js";
 import { renderHome } from "./views/home.js";
 import { renderRewards } from "./views/rewards.js";
+import { renderNotes } from "./views/notes.js";
 import { renderSettings } from "./views/settings.js";
 import { renderSleep } from "./views/sleep.js";
 
@@ -49,6 +53,7 @@ const memory = {
   historyMonth: null,
   journalEditing: false,
   journalDraft: null,
+  noteDraft: null,
   dayNote: null,
   reviewDraft: null,
 };
@@ -74,7 +79,10 @@ const actions = {
   deleteSleep,
   saveJournal,
   deleteJournal,
+  deleteNote,
+  saveNote,
   saveReview,
+  toggleNoteItem,
   claimReward,
   claimMilestone,
   updateSettings,
@@ -110,6 +118,10 @@ function parseRoute(hash) {
   if (a === "history" && b) return { name: "history", goalId: decodeURIComponent(b) };
   if (a === "history") return { name: "history", goalId: null };
   if (a === "settings") return { name: "settings" };
+  if (a === "notes" && b === "new") return { name: "note-edit", id: null };
+  if (a === "notes" && c === "edit") return { name: "note-edit", id: decodeURIComponent(b) };
+  if (a === "notes" && b) return { name: "note", id: decodeURIComponent(b) };
+  if (a === "notes") return { name: "notes" };
   return { name: "home" };
 }
 
@@ -180,6 +192,7 @@ function paint() {
     else if (route.name === "sleep" || route.name === "sleep-day") view = renderSleep(ctx);
     else if (route.name === "rewards") view = renderRewards(ctx);
     else if (route.name === "history" || route.name === "day" || route.name === "review") view = renderHistory(ctx);
+    else if (route.name === "notes" || route.name === "note" || route.name === "note-edit") view = renderNotes(ctx);
     else view = renderSettings(ctx);
   } catch (error) {
     console.error(error);
@@ -290,6 +303,7 @@ function restoreView(root, saved, previousSheets) {
 }
 
 function titleFor(name) {
+  if (name === "note-edit" && !route.id) return `B4O7 · ${t("notes.newNote")}`;
   const names = {
     home: "title.home",
     goals: "title.goals",
@@ -302,6 +316,9 @@ function titleFor(name) {
     day: "title.day",
     review: "title.review",
     settings: "title.settings",
+    notes: "title.notes",
+    note: "title.note",
+    "note-edit": "title.noteEdit",
   };
   return `B4O7 · ${t(names[name] || "title.home")}`;
 }

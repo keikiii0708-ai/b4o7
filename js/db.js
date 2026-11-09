@@ -1,5 +1,5 @@
 const DB_NAME = "b4o7";
-const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export const STORE_NAMES = [
   "goals",
@@ -12,7 +12,25 @@ export const STORE_NAMES = [
   "rewardClaims",
   "images",
   "settings",
+  "notes",
 ];
+
+const INDEXES = {
+  dailyRecords: [["goalId", "goalId"], ["date", "date"]],
+  sleepRecords: [["wakeDate", "wakeDate"]],
+  milestones: [["goalId", "goalId"]],
+  weekSnapshots: [["goalId", "goalId"]],
+  rewardClaims: [["goalId", "goalId"]],
+};
+
+// Create missing stores only. An upgrade must not delete or rewrite existing data.
+export function upgradeDatabase(db) {
+  for (const name of STORE_NAMES) {
+    if (db.objectStoreNames.contains(name)) continue;
+    const store = db.createObjectStore(name, { keyPath: "id" });
+    for (const [indexName, key] of INDEXES[name] || []) store.createIndex(indexName, key, { unique: false });
+  }
+}
 
 let dbPromise = null;
 
@@ -21,22 +39,7 @@ function openDb() {
   dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
-      const db = request.result;
-      const create = (name, indexes = []) => {
-        if (db.objectStoreNames.contains(name)) return;
-        const store = db.createObjectStore(name, { keyPath: "id" });
-        for (const [indexName, key] of indexes) store.createIndex(indexName, key, { unique: false });
-      };
-      create("goals");
-      create("dailyRecords", [["goalId", "goalId"], ["date", "date"]]);
-      create("sleepRecords", [["wakeDate", "wakeDate"]]);
-      create("milestones", [["goalId", "goalId"]]);
-      create("journal");
-      create("weeklyReviews");
-      create("weekSnapshots", [["goalId", "goalId"]]);
-      create("rewardClaims", [["goalId", "goalId"]]);
-      create("images");
-      create("settings");
+      upgradeDatabase(request.result);
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error || new Error("Could not open the database."));

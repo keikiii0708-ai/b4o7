@@ -1,5 +1,6 @@
-import { addDays, formatPrettyDate, weekMeta } from "../dates.js";
+import { addDays, formatPrettyDate, formatShortDate, weekMeta } from "../dates.js";
 import { displayDuration, moodLabel, t } from "../i18n.js";
+import { countdownPhrase, nearestUpcoming, notePreview } from "../notes.js";
 import { shouldRemindBackup } from "../reminders.js";
 import { buildGoalWeek } from "../selectors.js";
 import { evaluateSleep, findOpenSleep } from "../sleep.js";
@@ -20,6 +21,7 @@ export function renderHome(ctx) {
     }),
     ctx.reminder ? reminderBanner(ctx) : null,
     shouldRemindBackup(ctx.state, ctx.today) ? backupBanner(ctx) : null,
+    notesHomeCard(ctx),
     ranked.length ? homeFilled(ctx, ranked) : homeEmpty(ctx),
   ]);
 }
@@ -31,12 +33,15 @@ function rank(result) {
 }
 
 function homeEmpty(ctx) {
-  return h("section", { class: "empty hero-empty" }, [
-    h("img", { class: "brand-hero", src: "./icons/favicon.svg", alt: "", width: "96", height: "96" }),
-    h("p", { class: "slogan", text: t("copy.own") }),
-    h("h2", { text: t("copy.series") }),
-    h("p", { class: "muted", text: t("copy.win4") }),
-    h("button", { class: "btn primary block", onClick: () => ctx.go("/goals/new") }, t("home.addGoal")),
+  return h("div", {}, [
+    h("section", { class: "empty hero-empty" }, [
+      h("img", { class: "brand-hero", src: "./icons/favicon.svg", alt: "", width: "96", height: "96" }),
+      h("p", { class: "slogan", text: t("copy.own") }),
+      h("h2", { text: t("copy.series") }),
+      h("p", { class: "muted", text: t("copy.win4") }),
+      h("button", { class: "btn primary block", onClick: () => ctx.go("/goals/new") }, t("home.addGoal")),
+    ]),
+    (ctx.state.notes || []).length ? null : notesQuiet(ctx),
   ]);
 }
 
@@ -71,6 +76,7 @@ function homeFilled(ctx, ranked) {
         renderTodayAction(ctx, goal, week),
       ]))),
       sleepSummary(ctx),
+      (ctx.state.notes || []).length ? null : notesQuiet(ctx),
       journalCard(ctx),
       rewardPreview(ctx, ranked),
       review ? reviewCard(ctx, review) : null,
@@ -143,6 +149,64 @@ function sleepMessage(result) {
   if (result?.reason === "no-open") return t("sleep.errorNoOpen");
   if (result?.reason === "open") return t("sleep.errorAlreadyBed");
   return t("sleep.errorGeneric");
+}
+
+function notesHomeCard(ctx) {
+  const notes = ctx.state.notes || [];
+  if (!notes.length) return null;
+  const nearest = nearestUpcoming(notes, ctx.today);
+  if (nearest) return countdownHomeCard(ctx, nearest);
+  const latest = [...notes].sort((a, b) => String(b.updatedAt || "").localeCompare(String(a.updatedAt || "")))[0];
+  const preview = notePreview(latest);
+  return h("section", { class: "note-home-wrap" }, [
+    h("p", { class: "eyebrow", text: t("notes.title") }),
+    h("button", {
+      class: "card note-home",
+      "data-action": "open-notes",
+      onClick: () => ctx.go("/notes"),
+    }, [
+      h("div", { class: "note-home-copy" }, [
+        h("h2", { class: "goal-name", text: latest.title.trim() || t("notes.untitled") }),
+        preview ? h("p", { class: "note-preview", text: preview }) : null,
+      ]),
+    ]),
+  ]);
+}
+
+function countdownHomeCard(ctx, nearest) {
+  const { note, count } = nearest;
+  return h("section", { class: "note-home-wrap" }, [
+    h("p", { class: "eyebrow", text: t("notes.title") }),
+    h("button", {
+      class: "card note-home",
+      "data-action": "open-notes",
+      onClick: () => ctx.go("/notes"),
+    }, [
+      h("p", {
+        class: "count-num",
+        "data-metric-key": `countdown:${note.id}`,
+        text: String(count.days),
+      }),
+      h("div", { class: "note-home-copy" }, [
+        h("p", { class: "count-phrase", text: countdownPhrase(count) }),
+        h("h2", { class: "goal-name", text: note.title.trim() || t("notes.untitled") }),
+        h("p", { class: "hint", text: formatShortDate(note.countdownDate) }),
+      ]),
+    ]),
+  ]);
+}
+
+function notesQuiet(ctx) {
+  return h("section", { class: "note-quiet" }, [
+    h("p", { class: "eyebrow", text: t("notes.title") }),
+    h("button", {
+      class: "card note-home",
+      "data-action": "open-notes",
+      onClick: () => ctx.go("/notes"),
+    }, [
+      h("span", { class: "muted", text: t("notes.homeEmpty") }),
+    ]),
+  ]);
 }
 
 function journalCard(ctx) {

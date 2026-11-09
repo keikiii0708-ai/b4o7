@@ -1,4 +1,4 @@
-const CACHE = "b4o7-v6";
+const CACHE = "b4o7-v7";
 
 const ASSETS = [
   "./",
@@ -20,7 +20,9 @@ const ASSETS = [
   "./js/store.js",
   "./js/ui.js",
   "./js/motion.js",
+  "./js/notes.js",
   "./js/views/home.js",
+  "./js/views/notes.js",
   "./js/views/goals.js",
   "./js/views/sleep.js",
   "./js/views/rewards.js",

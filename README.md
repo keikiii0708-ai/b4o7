@@ -2,7 +2,7 @@
 
 A week is like a 7-game series. All you gotta do is win 4 days.
 
-B4O7 is a private habit tracker that stays on your phone. There is no account, no server, and no analytics. Goals, sleep, notes, and reward photos are stored in this browser only. The app works offline after it has loaded once.
+B4O7 is a private habit tracker that stays on your phone. There is no account, no server, and no analytics. Goals, sleep, today's log, notes, and reward photos are stored in this browser only. The app works offline after it has loaded once.
 
 Each goal has its own series. Nothing is combined into one score.
 
@@ -51,9 +51,13 @@ On a Mac, open the same address in a browser. The layout stays in a centered col
 
 Sleep is its own screen. A night is tied to the morning you wake up. Bedtime, wake time, and the gap are stored with the time zone. “7h 53m” is the recorded interval, not a medical measurement. A night with no wake time stays incomplete. Correcting a night is marked as corrected.
 
+## Notes
+
+Notes are separate from Today's log. A note can hold a title, free writing, and checklist lines you can tick. A countdown is optional: choose a date and the note shows the days left, that the day is today, or the days since. Turning the countdown off keeps the note. Home shows the nearest upcoming countdown and opens Notes. Notes stay on this device and are included in the backup and the history CSV.
+
 ## Backup and restore
 
-Settings → **Export backup** downloads one JSON file. It includes notes, sleep, and any photos you attached. On iPhone, Safari may put it in Downloads. Move it to the Files app, or somewhere else you trust.
+Settings → **Export backup** downloads one JSON file. It includes today's log, notes, checklists, sleep, and any photos you attached. On iPhone, Safari may put it in Downloads. Move it to the Files app, or somewhere else you trust.
 
 **Export history CSV** is a spreadsheet of the days, without photos.
 

@@ -5,6 +5,7 @@ import * as db from "./db.js";
 import { buildDemo } from "./demo.js";
 import { attributeWakeDate, defaultSleepTargets, submissionCheck } from "./sleep.js";
 import { buildGoalWeek, listWeeks } from "./selectors.js";
+import { prepareNote } from "./notes.js";
 import { makeWeekSnapshot, milestoneProgress, remapSnapshots, snapshotsEqual, timerStatus, validateGoalConfig } from "./scoring.js";
 
 let state = null;
@@ -461,6 +462,37 @@ export async function deleteJournal(date) {
   await refresh();
 }
 
+export async function saveNote(draft) {
+  const existing = draft?.id ? (state.notes || []).find((note) => note.id === draft.id) || null : null;
+  const now = new Date().toISOString();
+  const prepared = prepareNote(draft, existing, { now, today: today(), newId: uid });
+  if (!prepared.ok) return prepared;
+  const note = { ...prepared.note, id: existing?.id || prepared.note.id || uid() };
+  await db.put("notes", note);
+  await refresh();
+  return { ok: true, id: note.id };
+}
+
+export async function deleteNote(id) {
+  await db.del("notes", id);
+  await refresh();
+}
+
+export async function toggleNoteItem(noteId, itemId) {
+  const note = (state.notes || []).find((item) => item.id === noteId);
+  if (!note) return { ok: false };
+  let found = false;
+  const items = (note.items || []).map((item) => {
+    if (item.id !== itemId) return item;
+    found = true;
+    return { ...item, checked: !item.checked };
+  });
+  if (!found) return { ok: false };
+  await db.put("notes", { ...note, items, updatedAt: new Date().toISOString() });
+  await refresh();
+  return { ok: true, checked: items.find((item) => item.id === itemId)?.checked };
+}
+
 export async function saveReview(review) {
   const now = new Date().toISOString();
   const existing = state.weeklyReviews.find((item) => item.id === review.weekStart);
@@ -575,7 +607,7 @@ export async function importBackup(data, mode) {
     settings.createdAt = state.settings.createdAt || settings.createdAt;
   }
   await db.put("settings", { ...defaultSettings(), ...settings, id: "app" });
-  for (const field of ["goals", "dailyRecords", "sleepRecords", "milestones", "journal", "weeklyReviews", "weekSnapshots", "rewardClaims", "images"]) {
+  for (const field of ["goals", "dailyRecords", "sleepRecords", "milestones", "journal", "weeklyReviews", "weekSnapshots", "rewardClaims", "images", "notes"]) {
     if (rows[field]?.length) await db.bulkPut(field, rows[field]);
   }
   await refresh();
