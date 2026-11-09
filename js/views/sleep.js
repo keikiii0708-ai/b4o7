@@ -1,7 +1,8 @@
 import { addDays, formatMonthYear, formatPrettyDate, localParts, monthGrid, shiftMonth, weekDayLetters } from "../dates.js";
 import { displayDuration, intlLocale, t } from "../i18n.js";
 import { sleepCalendarMark, sleepSessionForDate, evaluateSleep, findOpenSleep } from "../sleep.js";
-import { calendar, field, h, monthSwitcher, sheetFrame, showToast, topbar } from "../ui.js";
+import { armCheck } from "../motion.js";
+import { calendar, checkMark, field, h, monthSwitcher, sheetFrame, showToast, topbar } from "../ui.js";
 
 let form = null;
 
@@ -85,14 +86,21 @@ function latestCard(ctx) {
     h("p", { class: "hint", text: t("sleep.lastInterval") }),
     h("p", { class: "big-time", text: displayDuration(evaluation.durationLabel) || t("home.incomplete") }),
     h("p", { class: "hint", text: t("sleep.notMedical") }),
-    checks(evaluation),
+    checks(evaluation, latest.id),
   ]);
 }
 
-function checks(evaluation) {
+function checks(evaluation, recordId) {
   if (!evaluation.checks?.length) return h("p", { class: "hint", text: evaluation.win ? t("sleep.noExtra") : "" });
-  return h("div", { class: "checks" }, evaluation.checks.map((check) => h("div", { class: "check" }, [
-    h("span", { text: `${checkLabel(check)} · ${checkDetail(check)}` }),
+  return h("div", { class: "checks" }, evaluation.checks.map((check) => h("div", {
+    class: "check",
+    "data-check-key": `sleep:${recordId || "night"}:${check.id}`,
+    "data-checked": check.passed ? "1" : "0",
+  }, [
+    h("span", { class: "check-copy" }, [
+      check.passed ? checkMark() : null,
+      h("span", { text: `${checkLabel(check)} · ${checkDetail(check)}` }),
+    ]),
     h("span", { class: check.passed ? "passed" : "unmet", text: check.passed ? t("sleep.passed") : t("sleep.notMet") }),
   ])));
 }
@@ -122,7 +130,7 @@ function targetsForm(ctx) {
     await ctx.actions.updateSettings({ sleepTargets: { ...targets, ...partial } });
   };
   return h("div", { class: "card" }, [
-    toggleRow(t("sleep.latestBedtime"), targets.latestBedtimeEnabled, (enabled) => patch({ latestBedtimeEnabled: enabled })),
+    toggleRow(t("sleep.latestBedtime"), targets.latestBedtimeEnabled, (enabled) => patch({ latestBedtimeEnabled: enabled }), "sleep-bed"),
     targets.latestBedtimeEnabled ? h("input", {
       type: "time",
       lang: intlLocale(),
@@ -130,7 +138,7 @@ function targetsForm(ctx) {
       "aria-label": t("sleep.latestBedtime"),
       onChange: (event) => patch({ latestBedtime: event.target.value }),
     }) : null,
-    toggleRow(t("sleep.latestWake"), targets.latestWakeEnabled, (enabled) => patch({ latestWakeEnabled: enabled })),
+    toggleRow(t("sleep.latestWake"), targets.latestWakeEnabled, (enabled) => patch({ latestWakeEnabled: enabled }), "sleep-wake"),
     targets.latestWakeEnabled ? h("input", {
       type: "time",
       lang: intlLocale(),
@@ -138,7 +146,7 @@ function targetsForm(ctx) {
       "aria-label": t("sleep.latestWake"),
       onChange: (event) => patch({ latestWake: event.target.value }),
     }) : null,
-    toggleRow(t("sleep.minMandatory"), targets.minDurationEnabled, (enabled) => patch({ minDurationEnabled: enabled })),
+    toggleRow(t("sleep.minMandatory"), targets.minDurationEnabled, (enabled) => patch({ minDurationEnabled: enabled }), "sleep-duration"),
     targets.minDurationEnabled ? h("div", { class: "two" }, [
       h("input", {
         type: "number",
@@ -163,10 +171,16 @@ function targetsForm(ctx) {
   ]);
 }
 
-function toggleRow(label, on, toggle) {
+function toggleRow(label, on, toggle, key) {
   return h("div", { class: "switch-row" }, [
     h("span", { text: label }),
-    h("button", { type: "button", class: `toggle${on ? " on" : ""}`, "aria-pressed": on ? "true" : "false", onClick: () => toggle(!on) }, [h("i")]),
+    h("button", {
+      type: "button",
+      class: `toggle${on ? " on" : ""}`,
+      "data-switch-key": key,
+      "aria-pressed": on ? "true" : "false",
+      onClick: () => toggle(!on),
+    }, [h("i")]),
   ]);
 }
 
@@ -191,7 +205,7 @@ function renderSleepDay(ctx) {
       ]),
       h("p", { class: "hint", text: `${record.bedtimeOffset || ""} ${record.bedtimeTz || ""}`.trim() }),
       evaluation ? h("p", { class: "big-time", style: { marginTop: "10px" }, text: displayDuration(evaluation.durationLabel) || t("home.incomplete") }) : h("p", { class: "hint", text: t("sleep.incompleteNoInvent") }),
-      evaluation ? checks(evaluation) : null,
+      evaluation ? checks(evaluation, record.id) : null,
       record.note ? h("p", { class: "note-body", text: record.note }) : null,
       record.corrected ? h("p", { class: "hint", text: t("sleep.corrected") }) : null,
       h("div", { class: "correct-row" }, [
@@ -220,6 +234,12 @@ function sleepForm(ctx, record) {
     class: "sheet-form",
     onSubmit: async (event) => {
       event.preventDefault();
+      if (record?.id && record.wakeUtc) {
+        const before = evaluateSleep(record);
+        for (const item of before.checks || []) {
+          if (!item.passed) armCheck(`sleep:${record.id}:${item.id}`);
+        }
+      }
       const result = await ctx.actions.saveSleepManual({
         id: record?.id,
         bedDate: form.bedDate,

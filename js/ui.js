@@ -1,5 +1,6 @@
 import { formatPrettyDate, weekDayLetters } from "./dates.js";
 import { stateLabel, t } from "./i18n.js";
+import { CHECK_PATH, armCheck } from "./motion.js";
 import { statusLabel, timerStatus } from "./scoring.js";
 
 const urls = new Map();
@@ -72,6 +73,32 @@ export function icon(name) {
   add("path", { ...stroke, d: paths[name] || paths.home });
   if (name === "gift") add("path", { ...stroke, d: "M12 7c-1.8 0-3-1.6-2-2.8C11.2 3 12 5.2 12 7c1.8 0 3-1.6 2-2.8C12.8 3 12 5.2 12 7z" });
   return svg;
+}
+
+export function checkMark() {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("class", "check-mark");
+  svg.setAttribute("aria-hidden", "true");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", CHECK_PATH);
+  path.setAttribute("pathLength", "1");
+  path.setAttribute("fill", "none");
+  path.setAttribute("stroke", "currentColor");
+  path.setAttribute("stroke-width", "2.6");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+  svg.append(path);
+  return svg;
+}
+
+export function checkHost(key, checked) {
+  return h("span", {
+    class: "check-host",
+    "data-check-key": key,
+    "data-checked": checked ? "1" : "0",
+    "aria-hidden": "true",
+  }, checked ? [checkMark()] : null);
 }
 
 const RING_SWEEP = 360 / 7 - 18;
@@ -175,11 +202,15 @@ export function dots(states, letters) {
   ]);
 }
 
-export function meter(wins, target) {
-  const pct = target ? Math.min(100, Math.round((wins / target) * 100)) : 0;
+export function meter(wins, target, key) {
+  const ratio = target ? Math.min(1, Math.max(0, wins / target)) : 0;
+  const bar = { style: { "--p": String(Math.round(ratio * 1000) / 1000) } };
+  if (key) bar["data-meter-key"] = key;
+  const label = { class: "meter-label", text: t("meter", { wins, target }) };
+  if (key) label["data-metric-key"] = `${key}:label`;
   return h("div", { class: "meter-row" }, [
-    h("div", { class: "meter", "aria-hidden": "true" }, [h("span", { style: { width: `${pct}%` } })]),
-    h("span", { class: "meter-label", text: t("meter", { wins, target }) }),
+    h("div", { class: "meter", "aria-hidden": "true" }, [h("span", bar)]),
+    h("span", label),
   ]);
 }
 
@@ -195,7 +226,7 @@ export function seriesCard({ goal, week, weekStartsOn, featured, footer, onOpen 
           featured ? null : h("span", { class: "emoji", "aria-hidden": "true", text: goal.icon || "•" }),
           h("div", { class: "series-copy" }, featured ? [
             h("p", { class: `status-line ${result.status}`, text: statusLabel(result.status) }),
-            h("p", { class: "score", text: result.score }),
+            h("p", { class: "score", "data-metric-key": `score:${goal.id}:${week.weekStart}`, text: result.score }),
             h("h2", { class: "goal-name", text: goal.name }),
           ] : [
             h("h2", { class: "goal-name", text: goal.name }),
@@ -203,35 +234,44 @@ export function seriesCard({ goal, week, weekStartsOn, featured, footer, onOpen 
           ]),
         ]),
         featured ? ring : h("div", { class: "series-side" }, [
-          h("p", { class: "score", text: result.score }),
+          h("p", { class: "score", "data-metric-key": `score:${goal.id}:${week.weekStart}`, text: result.score }),
           ring,
         ]),
       ]),
       h("p", { class: "copy", text: week.copy }),
       dots(week.dayStates, letters),
-      meter(result.wins, result.target),
+      meter(result.wins, result.target, `meter:${goal.id}:${week.weekStart}`),
     ]),
     footer || null,
   ]);
 }
 
+function withDayMark(node, goalId, date, on) {
+  node.prepend(checkHost(`day:${goalId}:${date}`, on));
+  return node;
+}
+
 export function renderTodayAction(ctx, goal, week) {
   const index = week.dates.indexOf(ctx.today);
   const dayState = week.dayStates[index];
-  if (dayState === "neutral") return h("span", { class: "pill", text: t("state.neutral") });
+  const date = ctx.today;
+  if (dayState === "neutral") return withDayMark(h("span", { class: "pill", text: t("state.neutral") }), goal.id, date, false);
   if (dayState === "win") {
     if (goal.completionMethod === "manual") {
-      return h("button", { class: "btn ghost small", onClick: () => ctx.actions.setDayExplicit(goal.id, ctx.today, null) }, t("action.undo"));
+      return withDayMark(h("button", {
+        class: "btn ghost small with-check",
+        onClick: () => ctx.actions.setDayExplicit(goal.id, date, null),
+      }, t("action.undo")), goal.id, date, true);
     }
-    return h("span", { class: "pill win", text: t("state.win") });
+    return withDayMark(h("span", { class: "pill win with-check", text: t("state.win") }), goal.id, date, true);
   }
-  if (dayState === "loss") return h("span", { class: "pill loss", text: t("state.loss") });
+  if (dayState === "loss") return withDayMark(h("span", { class: "pill loss", text: t("state.loss") }), goal.id, date, false);
   if (goal.completionMethod === "timer") {
-    const record = ctx.state.dailyRecords.find((item) => item.goalId === goal.id && item.date === ctx.today);
+    const record = ctx.state.dailyRecords.find((item) => item.goalId === goal.id && item.date === date);
     const minutes = week.snapshot.timerDurationMinutes || goal.timerDurationMinutes || 25;
     if (record?.timerStartedAt && !record.timerEndedAt) {
       const status = timerStatus(record.timerStartedAt, minutes, ctx.now);
-      return h("div", { class: "timer-live" }, [
+      return withDayMark(h("div", { class: "timer-live" }, [
         h("span", {
           class: "timer-readout",
           dataset: {
@@ -239,25 +279,26 @@ export function renderTodayAction(ctx, goal, week) {
             start: record.timerStartedAt,
             need: String(minutes * 60000),
             goal: goal.id,
-            date: ctx.today,
+            date,
           },
           text: formatClock(status.remainingMs),
         }),
-        h("button", { class: "btn ghost small", onClick: () => ctx.actions.cancelTimer(goal.id, ctx.today) }, t("action.cancel")),
-      ]);
+        h("button", { class: "btn ghost small", onClick: () => ctx.actions.cancelTimer(goal.id, date) }, t("action.cancel")),
+      ]), goal.id, date, false);
     }
-    return h("button", { class: "btn primary small", onClick: () => ctx.actions.startTimer(goal.id, ctx.today) }, t("goal.startTimer", { minutes }));
+    return withDayMark(h("button", { class: "btn primary small", onClick: () => ctx.actions.startTimer(goal.id, date) }, t("goal.startTimer", { minutes })), goal.id, date, false);
   }
   if (goal.completionMethod === "threshold") {
-    const record = ctx.state.dailyRecords.find((item) => item.goalId === goal.id && item.date === ctx.today);
+    const record = ctx.state.dailyRecords.find((item) => item.goalId === goal.id && item.date === date);
     const label = week.snapshot.thresholdLabel || goal.thresholdLabel || t("goal.countFallback");
     const target = week.snapshot.thresholdTarget ?? goal.thresholdTarget ?? "";
-    return h("form", {
+    return withDayMark(h("form", {
       class: "inline-form",
       onSubmit: (event) => {
         event.preventDefault();
+        armCheck(`day:${goal.id}:${date}`);
         const value = new FormData(event.currentTarget).get("value");
-        ctx.actions.logThreshold(goal.id, ctx.today, value);
+        ctx.actions.logThreshold(goal.id, date, value);
       },
     }, [
       h("input", {
@@ -272,12 +313,18 @@ export function renderTodayAction(ctx, goal, week) {
         "data-live": "text",
       }),
       h("button", { type: "submit", class: "btn primary small" }, t("action.log")),
-    ]);
+    ]), goal.id, date, false);
   }
   if (goal.completionMethod === "sleep") {
-    return h("button", { class: "btn ghost small", onClick: () => ctx.go("/sleep") }, t("nav.sleep"));
+    return withDayMark(h("button", { class: "btn ghost small", onClick: () => ctx.go("/sleep") }, t("nav.sleep")), goal.id, date, false);
   }
-  return h("button", { class: "btn primary small", onClick: () => ctx.actions.setDayExplicit(goal.id, ctx.today, "win") }, t("goal.logWin"));
+  return withDayMark(h("button", {
+    class: "btn primary small",
+    onClick: () => {
+      armCheck(`day:${goal.id}:${date}`);
+      ctx.actions.setDayExplicit(goal.id, date, "win");
+    },
+  }, t("goal.logWin")), goal.id, date, false);
 }
 
 export function topbar({ title, date, brand, onBack, onSettings }) {

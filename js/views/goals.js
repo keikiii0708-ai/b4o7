@@ -47,7 +47,9 @@ function goalRow(ctx, goal) {
     ]),
     h("span", { class: "row-trail" }, [
       progressRing(week.dayStates, { size: 32, hidden: true }),
-      h("span", { class: "row-score", text: goal.status === "active" ? week.result.score : goalStatusLabel(goal.status) }),
+      goal.status === "active"
+        ? h("span", { class: "row-score", "data-metric-key": `row:${goal.id}`, text: week.result.score })
+        : h("span", { class: "row-score", text: goalStatusLabel(goal.status) }),
     ]),
   ]);
 }
@@ -77,17 +79,21 @@ function renderDetail(ctx) {
     goal.description ? h("p", { class: "muted", style: { marginTop: "14px" }, text: goal.description }) : null,
     goal.notes ? h("p", { class: "note-body", text: goal.notes }) : null,
     h("div", { class: "stats", style: { marginTop: "16px" } }, [
-      stat(String(stats.totalWon), t("goal.weeksWon")),
-      stat(String(stats.totalLost), t("goal.weeksClosed")),
-      stat(String(stats.currentStreak), t("goal.currentStreak")),
-      stat(String(stats.longestStreak), t("goal.longestStreak")),
+      stat(String(stats.totalWon), t("goal.weeksWon"), `stat:${goal.id}:won`),
+      stat(String(stats.totalLost), t("goal.weeksClosed"), `stat:${goal.id}:lost`),
+      stat(String(stats.currentStreak), t("goal.currentStreak"), `stat:${goal.id}:streak`),
+      stat(String(stats.longestStreak), t("goal.longestStreak"), `stat:${goal.id}:best`),
     ]),
     week.snapshot.reward ? rewardBlock(week) : null,
     milestones.length ? h("section", {}, [
       h("p", { class: "eyebrow", text: t("goal.milestones") }),
       h("div", { class: "stack" }, milestones.map(({ milestone, progress }) => h("div", { class: "card" }, [
         h("strong", { text: milestone.kind === "consecutive" ? t("goal.consecutiveSeries") : t("goal.totalSeries") }),
-        h("p", { class: "hint", text: t("goal.progress", { current: progress.current, required: progress.required, remaining: progress.remaining }) }),
+        h("p", {
+          class: "hint",
+          "data-metric-key": `progress:${milestone.id}`,
+          text: t("goal.progress", { current: progress.current, required: progress.required, remaining: progress.remaining }),
+        }),
         milestone.rewardDescription ? h("p", { style: { marginTop: "8px" }, text: milestone.rewardDescription }) : null,
       ]))),
     ]) : null,
@@ -173,7 +179,7 @@ function renderEditor(ctx) {
     h("div", { class: "spread", style: { marginTop: "16px" } }, [
       h("div", {}, [
         h("p", { class: "field-label", text: t("goal.weeklyTarget") }),
-        h("p", { class: "score", text: String(goal.weeklyTarget) }),
+        h("p", { class: "score", "data-metric-key": `target:${goal.id}`, text: String(goal.weeklyTarget) }),
       ]),
       h("div", { class: "correct-row" }, [
         h("button", { type: "button", class: "btn ghost", "aria-label": t("action.decrease"), onClick: () => stepTarget(ctx, -1) }, "−"),
@@ -216,6 +222,7 @@ function renderEditor(ctx) {
       h("button", {
         type: "button",
         class: `toggle${goal.reminder?.enabled ? " on" : ""}`,
+        "data-switch-key": "goal-reminder",
         "aria-pressed": goal.reminder?.enabled ? "true" : "false",
         onClick: () => {
           goal.reminder = { ...(goal.reminder || { time: "21:00" }), enabled: !goal.reminder?.enabled };
@@ -316,8 +323,10 @@ async function save(ctx) {
   ctx.go(`/goals/${result.id}`);
 }
 
-function stat(num, label) {
-  return h("div", { class: "stat" }, [h("p", { class: "stat-num", text: num }), h("p", { text: label })]);
+function stat(num, label, key) {
+  const numAttrs = { class: "stat-num", text: num };
+  if (key) numAttrs["data-metric-key"] = key;
+  return h("div", { class: "stat" }, [h("p", numAttrs), h("p", { text: label })]);
 }
 
 function missing(ctx) {

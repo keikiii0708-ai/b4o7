@@ -253,8 +253,12 @@ function rewardPreview(ctx, ranked) {
       h("p", { class: "status-line", text: t("rewardStatus.locked") }),
       h("h2", { class: "goal-name", style: { marginTop: "6px" }, text: closest.week.snapshot.reward.name }),
       h("p", { class: "hint", text: closest.goal.name }),
-      meter(closest.week.result.wins, closest.week.result.target),
-      h("p", { class: "copy", text: t("home.moreWins", { count: closest.week.result.winsNeeded }) }),
+      meter(closest.week.result.wins, closest.week.result.target, `meter:${closest.goal.id}:${closest.week.weekStart}`),
+      h("p", {
+        class: "copy",
+        "data-metric-key": `need:${closest.goal.id}:${closest.week.weekStart}`,
+        text: t("home.moreWins", { count: closest.week.result.winsNeeded }),
+      }),
     ]);
   }
   return h("section", {}, [
