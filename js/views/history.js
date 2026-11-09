@@ -3,7 +3,7 @@ import { displayDuration, historySummary, moodLabel, stateLabel, t, weekLabel } 
 import { goalStats, monthDaysForGoal, performanceForMonth } from "../selectors.js";
 import { sleepSessionForDate, evaluateSleep } from "../sleep.js";
 import { buildGoalWeek } from "../selectors.js";
-import { MOODS, calendar, formatPercent, h, monthSwitcher, progressRing, sheetFrame, topbar } from "../ui.js";
+import { MOODS, calendar, checkMark, formatPercent, h, monthSwitcher, progressRing, sheetFrame, topbar } from "../ui.js";
 import { statusLabel } from "../scoring.js";
 
 export function renderHistory(ctx) {
@@ -36,17 +36,22 @@ function goalHistory(ctx, goal, month) {
   const recent = [...weeks].reverse().slice(0, 16);
   return h("div", {}, [
     h("div", { class: "stats", style: { marginTop: "16px" } }, [
-      stat(String(stats.totalWon), t("goal.weeksWon")),
-      stat(String(stats.totalLost), t("goal.weeksClosed")),
-      stat(formatPercent(stats.winRate), t("history.winRate")),
-      stat(String(stats.currentStreak), t("goal.currentStreak")),
+      stat(String(stats.totalWon), t("goal.weeksWon"), `hist:${goal.id}:won`),
+      stat(String(stats.totalLost), t("goal.weeksClosed"), `hist:${goal.id}:lost`),
+      stat(formatPercent(stats.winRate), t("history.winRate"), `hist:${goal.id}:rate`),
+      stat(String(stats.currentStreak), t("goal.currentStreak"), `hist:${goal.id}:streak`),
     ]),
-    h("p", { class: "hint", style: { marginTop: "8px" }, text: historySummary({
-      streak: stats.longestStreak,
-      days: stats.totalSuccessfulDays,
-      wins: performance.wins,
-      losses: performance.losses,
-    }) }),
+    h("p", {
+      class: "hint",
+      style: { marginTop: "8px" },
+      "data-metric-key": `histsum:${goal.id}:${month.year}-${month.month}`,
+      text: historySummary({
+        streak: stats.longestStreak,
+        days: stats.totalSuccessfulDays,
+        wins: performance.wins,
+        losses: performance.losses,
+      }),
+    }),
     monthSwitcher(formatMonthYear(month.year, month.month), () => {
       ctx.memory.historyMonth = shiftMonth(month.year, month.month, -1);
       ctx.draw();
@@ -164,10 +169,16 @@ function dayGoal(ctx, goal, date) {
       ["loss", t("state.loss")],
       ["neutral", t("state.neutral")],
       [null, t("history.clear")],
-    ].map(([explicit, label]) => h("button", {
-      class: `chip${record?.explicit === explicit ? " on" : ""}`,
-      onClick: () => ctx.actions.setDayExplicit(goal.id, date, explicit),
-    }, label))),
+    ].map(([explicit, label]) => {
+      const winChip = explicit === "win";
+      const checked = winChip && record?.explicit === "win";
+      return h("button", {
+        class: `chip${record?.explicit === explicit ? " on" : ""}${checked ? " with-check" : ""}`,
+        "data-check-key": winChip ? `explicit:${goal.id}:${date}` : null,
+        "data-checked": winChip ? (checked ? "1" : "0") : null,
+        onClick: () => ctx.actions.setDayExplicit(goal.id, date, explicit),
+      }, checked ? [checkMark(), label] : label);
+    })),
   ]);
 }
 
@@ -242,8 +253,10 @@ function area(label, key, draft) {
   ]);
 }
 
-function stat(num, label) {
-  return h("div", { class: "stat" }, [h("p", { class: "stat-num", text: num }), h("p", { text: label })]);
+function stat(num, label, key) {
+  const numAttrs = { class: "stat-num", text: num };
+  if (key) numAttrs["data-metric-key"] = key;
+  return h("div", { class: "stat" }, [h("p", numAttrs), h("p", { text: label })]);
 }
 
 function monthOf(iso) {

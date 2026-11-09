@@ -35,6 +35,7 @@ import {
   updateSettings,
   zone,
 } from "./store.js";
+import { installMotion, syncMotion } from "./motion.js";
 import { formatClock, h, icon, renderModal, showToast } from "./ui.js";
 import { renderGoals } from "./views/goals.js";
 import { renderHistory } from "./views/history.js";
@@ -204,6 +205,7 @@ function paint() {
     window.scrollTo(0, 0);
   }
   paint.sheets = restoreView(app, saved, paint.sheets || new Set());
+  syncMotion(app);
 }
 
 // A repaint rebuilds the whole DOM. Keep scroll offsets, focus, and open sheets
@@ -420,6 +422,7 @@ function startClock() {
 }
 
 async function main() {
+  installMotion();
   applyDocumentLocale();
   onLocaleChange(() => {
     if (booted) paint();

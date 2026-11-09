@@ -67,7 +67,7 @@ function rewardCard(ctx, goal, week, reward, status, claim, currentStart) {
     h("p", { class: "hint", text: `${goal.name} · ${week.weekStart === currentStart ? t("reward.thisWeek") : formatRange(week.weekStart, week.weekEnd)}` }),
     reward.description ? h("p", { style: { marginTop: "8px" }, text: reward.description }) : null,
     reward.priceLabel ? h("p", { class: "price", text: reward.priceLabel }) : null,
-    status === "locked" ? meter(week.result.wins, week.result.target) : null,
+    status === "locked" ? meter(week.result.wins, week.result.target, `meter:${goal.id}:${week.weekStart}`) : null,
     status === "locked" ? h("p", { class: "copy", text: week.copy }) : null,
     status === "unlocked" ? h("button", {
       class: "btn primary block",
@@ -96,8 +96,12 @@ function milestoneSection(ctx) {
       h("p", { class: "status-line", text: milestone.claimedAt ? t("rewardStatus.claimed") : progress.unlocked ? t("rewardStatus.unlocked") : t("rewardStatus.locked") }),
       h("h2", { class: "goal-name", style: { marginTop: "6px" }, text: milestone.rewardDescription || t("reward.milestone") }),
       h("p", { class: "hint", text: `${goal.name} · ${milestone.kind === "consecutive" ? t("reward.consecutive") : t("reward.total")}` }),
-      meter(Math.min(progress.current, progress.required), progress.required),
-      h("p", { class: "hint", text: t("goal.progress", { current: progress.current, required: progress.required, remaining: progress.remaining }) }),
+      meter(Math.min(progress.current, progress.required), progress.required, `ms:${milestone.id}`),
+      h("p", {
+        class: "hint",
+        "data-metric-key": `progress:${milestone.id}`,
+        text: t("goal.progress", { current: progress.current, required: progress.required, remaining: progress.remaining }),
+      }),
       progress.unlocked && !milestone.claimedAt ? h("button", {
         class: "btn primary block",
         style: { marginTop: "12px" },
